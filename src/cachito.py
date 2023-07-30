@@ -1,5 +1,4 @@
 # %% Import libs
-from pprint import pprint as pp
 import requests
 import click
 import json as json_lib
@@ -16,6 +15,7 @@ requests.packages.urllib3.disable_warnings()
 cachito_url = None
 nexus_url = None
 cert_url = None
+
 
 def validate_vars():
     if not cachito_url:
@@ -112,7 +112,7 @@ def describe(request_id, json):
             print(f"Repo: {j['repo']}")
             print(f"Ref: {j['ref']}")
             print(f"Package manager: {j['pkg_managers']}")
-            print(f"Dependencies:")
+            print("Dependencies:")
             for dep in j["dependencies"]:
                 print(f"  {dep['type']}: {dep['name']}=={dep['version']}")
             print(f"Environment variables: {j['environment_variables']}")
@@ -258,7 +258,7 @@ def download(request_id, output_dir):
 
         # print("Done")
     else:
-        print(f"Error generating 'cachito.env' file")
+        print("Error generating 'cachito.env' file")
 
 
 # Sonatype Nexus
@@ -282,8 +282,6 @@ def nexus_auth():
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
 def list_repos(json):
     """List Nexus repositories"""
-    # import HTTPBasicAuth
-    from requests.auth import HTTPBasicAuth
 
     r = requests.get(
         f"{nexus_url}/service/rest/v1/repositories",
@@ -305,8 +303,6 @@ def list_repos(json):
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
 def list_components(repo_name, json):
     """List components in a Nexus repository"""
-    # import HTTPBasicAuth
-    from requests.auth import HTTPBasicAuth
 
     def _pag_request(cont_token=None):
         params = {
@@ -353,8 +349,6 @@ def list_components(repo_name, json):
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
 def describe_repo(repo_name, json):
     """List packages in a Nexus repository"""
-    # import HTTPBasicAuth
-    from requests.auth import HTTPBasicAuth
 
     r = requests.get(
         f"{nexus_url}/service/rest/v1/repositories/{repo_name}/",
