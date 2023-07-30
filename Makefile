@@ -11,4 +11,4 @@ fmt: venv
 	./venv/bin/ruff --fix ./src/
 
 lint: venv
-	@./venv/bin/ruff
+	@./venv/bin/ruff check ./src/
