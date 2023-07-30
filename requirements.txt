@@ -1,3 +1,4 @@
 requests
 click
 openapi-python-client
+PyYAML

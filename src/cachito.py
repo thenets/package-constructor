@@ -396,4 +396,8 @@ if __name__ == "__main__":
     nexus.add_command(list_components)
     nexus.add_command(describe_repo)
 
+    import cli_server
+
+    cli_server.click_add_group(cli)
+
     cli()
