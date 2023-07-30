@@ -20,4 +20,4 @@ if [ -f .env ]; then
     source ${script_dir}/../.env
 fi
 
-python ${script_dir}/../src/cachito.py $@
+python ${script_dir}/../src/main.py $@

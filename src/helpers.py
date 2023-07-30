@@ -8,6 +8,9 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 logger.addHandler(ch)
 
+def get_global() -> dict:
+    return {"cachito_git_url": "https://github.com/containerbuildsystem/cachito"}
+
 
 def get_logger() -> logging.Logger:
     """Return the logger"""

@@ -6,8 +6,7 @@ import yaml
 import requests
 
 
-_global = {"cachito_git_url": "https://github.com/containerbuildsystem/cachito"}
-
+_global = helpers.get_global()
 logger = helpers.get_logger()
 
 
@@ -61,7 +60,7 @@ def _get_compose_file_data(repo_path: str):
 
 @click.command()
 @click.option(
-    "--clone-path", "-p", default=".", help="Path to clone the Cachito repository"
+    "--clone-path", "-p", default="./cache/cachito_repo", help="Path to clone the Cachito repository"
 )
 def cmd_deploy(clone_path):
     """Deploy a new Cachito server with all the related services."""
@@ -127,7 +126,7 @@ def cmd_deploy(clone_path):
 @click.option(
     "--clone-path",
     "-p",
-    default=".",
+    default="./cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_stop(clone_path):
@@ -236,7 +235,7 @@ def get_services(repo_path: str):
 @click.option(
     "--clone-path",
     "-p",
-    default=".",
+    default="./cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_status(clone_path):
