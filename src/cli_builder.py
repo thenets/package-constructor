@@ -1,9 +1,5 @@
 import click
 import helpers
-import os
-import json
-import yaml
-import requests
 
 
 _global = helpers.get_global()
@@ -21,6 +17,7 @@ def cmd_build(clone_path):
     """Build a container image using Cachito servers"""
     print("hello")
 
+
 # Click
 # ====================
 def click_add_group(cli: click.Group) -> None:
@@ -28,4 +25,3 @@ def click_add_group(cli: click.Group) -> None:
     cmd_server = click.Group("builder", help="Container builder commands")
     cmd_server.add_command(name="build", cmd=cmd_build)
     cli.add_command(cmd_server)
-

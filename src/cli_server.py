@@ -1,9 +1,7 @@
 import click
 import helpers
 import os
-import json
 import yaml
-import requests
 
 
 _global = helpers.get_global()
@@ -60,10 +58,13 @@ def _get_compose_file_data(repo_path: str):
 
 @click.command()
 @click.option(
-    "--clone-path", "-p", default="./cache/cachito_repo", help="Path to clone the Cachito repository"
+    "--clone-path",
+    "-p",
+    default="./cache/cachito_repo",
+    help="Path to clone the Cachito repository",
 )
-def cmd_deploy(clone_path):
-    """Deploy a new Cachito server with all the related services."""
+def cmd_start(clone_path):
+    """start a new Cachito server with all the related services."""
     clone_path_abs = os.path.abspath(clone_path)
 
     # Basic checks
@@ -140,95 +141,9 @@ def cmd_stop(clone_path):
         exit(1)
 
     logger.info("Stopping Cachito server")
-    helpers.run(["podman-compose", "down"], cwd=clone_path_abs)
-
-
-def get_services(repo_path: str):
-    """Get the services from the docker-compose.yml file"""
-    services = {
-        "athens": {},
-        "nexus": {},
-        "cachito": {},
-    }
-
-    # Get data from podman
-    podman_project_name = os.path.basename(repo_path)
-    cmd_out = helpers.run(
-        [
-            "podman",
-            "ps",
-            "-a",
-            "--format",
-            "json",
-            "--filter",
-            f"label=io.podman.compose.project={podman_project_name}",
-        ],
-        cwd=repo_path,
+    helpers.run(
+        ["podman-compose", "down", "-v", "--remove-orphans"], cwd=clone_path_abs
     )
-    containers = json.loads(cmd_out.stdout)
-    for container in containers:
-        service = {}
-
-        # Athens
-        if f"{podman_project_name}_athens_1" in container["Names"]:
-            if container["State"] != "running":
-                logger.fatal("Athens is not running")
-                exit(1)
-            service["port"] = {
-                "host": container["Ports"][0]["host_port"],
-                "container": container["Ports"][0]["container_port"],
-            }
-            service["url"] = f"http://localhost:{service['port']['host']}"
-            r = requests.get(service["url"] + "/healthz")
-            if r.status_code != 200:
-                logger.fatal(f"Error connecting to Athens: {r.status_code}")
-                exit(1)
-            services["athens"] = service
-
-        # Nexus
-        if f"{podman_project_name}_nexus_1" in container["Names"]:
-            if container["State"] != "running":
-                logger.fatal("Nexus is not running")
-                exit(1)
-            service["port"] = {
-                "host": container["Ports"][0]["host_port"],
-                "container": container["Ports"][0]["container_port"],
-            }
-            service["url"] = f"http://localhost:{service['port']['host']}"
-            r = requests.get(service["url"])
-            if r.status_code != 200:
-                logger.fatal(f"Error connecting to Nexus: {r.status_code}")
-                exit(1)
-            services["nexus"] = service
-            # Test nexus credentials
-            nexus_user = "cachito"
-            nexus_pass = "cachito"
-            r = requests.get(
-                service["url"] + "/service/rest/v1/repositories",
-                auth=(nexus_user, nexus_pass),
-            )
-            if r.status_code != 200:
-                logger.fatal(
-                    f"Invalid credentials. Error connecting to Nexus: {r.status_code}"
-                )
-                exit(1)
-
-        # Cachito
-        if f"{podman_project_name}_cachito-api_1" in container["Names"]:
-            if container["State"] != "running":
-                logger.fatal("Cachito is not running")
-                exit(1)
-            service["port"] = {
-                "host": container["Ports"][0]["host_port"],
-                "container": container["Ports"][0]["container_port"],
-            }
-            service["url"] = f"http://localhost:{service['port']['host']}"
-            r = requests.get(service["url"] + "/api/v1/status/short")
-            if r.status_code != 200:
-                logger.fatal(f"Error connecting to Cachito: {r.status_code}")
-                exit(1)
-            services["cachito"] = service
-    return services
 
 
 @click.command()
@@ -249,7 +164,7 @@ def cmd_status(clone_path):
         exit(1)
 
     logger.info("Retrieving Cachito server containers list")
-    services = get_services(clone_path_abs)
+    services = helpers.get_services(clone_path_abs)
 
     # Print status
     print("All services are operational")
@@ -264,7 +179,7 @@ def cmd_status(clone_path):
 def click_add_group(cli: click.Group) -> None:
     """Add the group to the CLI"""
     cmd_server = click.Group("server", help="Cachito server commands")
-    cmd_server.add_command(name="deploy", cmd=cmd_deploy)
+    cmd_server.add_command(name="start", cmd=cmd_start)
     cmd_server.add_command(name="stop", cmd=cmd_stop)
     cmd_server.add_command(name="status", cmd=cmd_status)
     cli.add_command(cmd_server)
