@@ -148,24 +148,25 @@ def cmd_build(clone_path, file, build_context):
     new_file_abs = _new_template_interceptor(file_abs, services)
 
     try:
-        import sys
+        command = [
+            "podman",
+            "build",
+            "-f",
+            new_file_abs,
+            "--dns",
+            "none",
+            "-t",
+            "test",
+            build_context_abs,
+        ]
+        helpers.cmd_log(command)
+        rc = os.system(" ".join(command))
+        if rc != 0:
+            raise Exception(f"Return code: {rc}")
 
-        helpers.check_output(
-            [
-                "podman",
-                "build",
-                "-f",
-                new_file_abs,
-                "--dns",
-                "none",
-                "-t",
-                "test",
-                build_context_abs,
-            ],
-            stderr=sys.stderr,
-        )
-    except:
+    except Exception as e:
         logger.error("Error building image. Aborting")
+        logger.error(e)
         exit(1)
 
     logger.info("Image built successfully")
