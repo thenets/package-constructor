@@ -61,14 +61,14 @@ def _new_template_interceptor(container_file_path:str, services:dict) -> str:
     template_string = """
 {{ container_file_content_before_disable }}
 #<cachito-disable> BEGIN
-# RUN set -x \\
-#     && echo "nameserver 1.1.1.1" > /etc/resolv.conf \\
-#     && echo "nameserver 8.8.8.8" > /etc/resolv.conf
+RUN set -x \\
+    && echo "nameserver 1.1.1.1" > /etc/resolv.conf \\
+    && echo "nameserver 8.8.8.8" > /etc/resolv.conf
 #<cachito-disable> END
 {{ container_file_content_after_disable }}
 #<cachito-proxy> BEGIN
-#RUN set -x \\
-#    && rm -f /etc/resolv.conf
+RUN set -x \\
+    && rm -f /etc/resolv.conf
 {% for k, v in custom_envs.items() %}
 ENV {{ k }}={{ v }}
 {%- endfor %}
@@ -139,7 +139,7 @@ def cmd_build(clone_path, file, build_context):
         import sys
         stdout = sys.stdout
         cmd_out = helpers.check_output(
-        ["podman", "build", "-f", new_file_abs, "-t", "test", build_context_abs], stderr=sys.stderr)
+        ["podman", "build", "-f", new_file_abs, "--dns", "none", "-t", "test", build_context_abs], stderr=sys.stderr)
     except:
         logger.error("Error building image. Aborting")
         exit(1)
