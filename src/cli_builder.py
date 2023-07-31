@@ -1,8 +1,9 @@
 import click
-import helpers
 import os
 import jinja2
 
+import helpers
+import common
 
 _global = helpers.get_global()
 logger = helpers.get_logger()
@@ -104,6 +105,41 @@ ENV {{ k }}={{ v }}
 
     return new_containerfile_path
 
+def _build_validate(file, build_context):
+    """Validate the build parameters"""
+
+    # Check if Containerfile exists
+    if not os.path.isfile(file):
+        logger.error("Containerfile not found: " + file)
+        exit(1)
+
+    # Check if build context exists
+    if build_context:
+        if not os.path.isdir(build_context):
+            logger.error("Build context not found: " + build_context)
+            exit(1)
+    else:
+        build_context = os.path.dirname(os.path.abspath(file))
+
+
+def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
+    def _generate_python_requirements_file(
+        repo_data: dict,
+        python_requirements_file_path: str,
+    ) -> None:
+        """Generate a requirements.txt file for a Python project"""
+        out = ""
+        for dependency in repo_data["dependencies"]:
+            if dependency["format"] == "pypi":
+                out += f"{dependency['name']}=={dependency['version']}\n"
+        with open(python_requirements_file_path, "w") as f:
+            f.write(out)
+
+    python_requirements_file_path = os.path.abspath(
+        os.path.join(os.path.dirname(file_abs), "requirements.txt")
+    )
+    logger.info("Retrieving: " + python_requirements_file_path)
+    _generate_python_requirements_file(repo_data, python_requirements_file_path)
 
 @click.command()
 @click.option(
@@ -112,14 +148,12 @@ ENV {{ k }}={{ v }}
     default="./cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
-# option: --file, -f
 @click.option(
     "--file",
     "-f",
     default="./Containerfile",
     help="Path to the Containerfile to build",
 )
-# option: --build-context
 @click.option(
     "--build-context",
     "-c",
@@ -127,11 +161,7 @@ ENV {{ k }}={{ v }}
 )
 def cmd_build(clone_path, file, build_context):
     """Build a container image using Cachito servers"""
-
-    # Check if Containerfile exists
-    if not os.path.isfile(file):
-        logger.error("Containerfile not found: " + file)
-        exit(1)
+    _build_validate(file, build_context)
 
     services = helpers.get_services(clone_path)
     networks = [service["network"] for service in services.values()]
@@ -171,6 +201,41 @@ def cmd_build(clone_path, file, build_context):
 
     logger.info("Image built successfully")
 
+    # TODO create new proxies instead of using the "cachito-pip-proxy"
+    repo_data = common._nexus_get_repo_data(services, "cachito-pip-proxy")
+
+    _create_python_requirements_file(file_abs, repo_data)
+
+
+@click.command()
+@click.option(
+    "--clone-path",
+    "-p",
+    default="./cache/cachito_repo",
+    help="Path where the Cachito repository is located",
+)
+@click.option(
+    "--file",
+    "-f",
+    default="./Containerfile",
+    help="Path to the Containerfile to build",
+)
+@click.option(
+    "--build-context",
+    "-c",
+    help="Path to the build context. Defaults to the directory of the Containerfile",
+)
+def cmd_get_dependencies(clone_path, file, build_context):
+    """Get the dependencies files for a container build"""
+    _build_validate(file, build_context)
+
+    services = helpers.get_services(clone_path)
+    # TODO create new proxies instead of using the "cachito-pip-proxy"
+    repo_data = common._nexus_get_repo_data(services, "cachito-pip-proxy")
+    file_abs = os.path.abspath(file)
+
+    _create_python_requirements_file(file_abs, repo_data)
+
 
 # Click
 # ====================
@@ -178,4 +243,5 @@ def click_add_group(cli: click.Group) -> None:
     """Add the group to the CLI"""
     cmd_server = click.Group("builder", help="Container builder commands")
     cmd_server.add_command(name="build", cmd=cmd_build)
+    cmd_server.add_command(name="get-dependencies", cmd=cmd_get_dependencies)
     cli.add_command(cmd_server)

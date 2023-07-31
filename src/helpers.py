@@ -52,7 +52,7 @@ logger = _setup_logger()
 def get_global() -> dict:
     return {
         "cachito_git_url": "https://github.com/containerbuildsystem/cachito",
-        "nexus_auth": {"username": "cachito", "password": "cachito"},
+        "nexus": {"user": "cachito", "pass": "cachito"},
     }
 
 
