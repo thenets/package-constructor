@@ -144,6 +144,12 @@ def cmd_stop(clone_path):
     helpers.run(
         ["podman-compose", "down", "-v", "--remove-orphans"], cwd=clone_path_abs
     )
+    logger.info("Removing volumes")
+    compose = _get_compose_file_data(clone_path_abs)
+    volume_path = os.path.join(
+        clone_path_abs, compose["services"]["nexus"]["volumes"][0].split(":")[0]
+    )
+    helpers.run(["podman", "unshare", "rm", "-rf", volume_path])
 
 
 @click.command()
