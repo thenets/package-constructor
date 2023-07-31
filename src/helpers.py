@@ -3,6 +3,7 @@ import subprocess
 import os
 import json
 import requests
+import datetime
 
 
 def _setup_logger():
@@ -11,10 +12,12 @@ def _setup_logger():
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+        "%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", datefmt="%H:%M:%S"
     )
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+    logger.debug("- Starting Cachito CLI -")
+    logger.debug(f"{datetime.datetime.now().strftime('%Y-%m-%d')}")
     return logger
 
 
@@ -83,9 +86,10 @@ def get_services(repo_path: str):
     containers = json.loads(cmd_out.stdout)
     for container in containers:
         service = {}
+        service['container_name'] = container["Names"][0]
 
         # Athens
-        if f"{podman_project_name}_athens_1" in container["Names"]:
+        if f"{podman_project_name}_athens_1" in service['container_name']:
             if container["State"] != "running":
                 logger.fatal("Athens is not running")
                 exit(1)
@@ -101,7 +105,7 @@ def get_services(repo_path: str):
             services["athens"] = service
 
         # Nexus
-        if f"{podman_project_name}_nexus_1" in container["Names"]:
+        if f"{podman_project_name}_nexus_1" in service['container_name']:
             if container["State"] != "running":
                 logger.fatal("Nexus is not running")
                 exit(1)
@@ -129,7 +133,7 @@ def get_services(repo_path: str):
                 exit(1)
 
         # Cachito
-        if f"{podman_project_name}_cachito-api_1" in container["Names"]:
+        if f"{podman_project_name}_cachito-api_1" in service['container_name']:
             if container["State"] != "running":
                 logger.fatal("Cachito is not running")
                 exit(1)
