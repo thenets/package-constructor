@@ -1,6 +1,4 @@
 import requests
-import click
-import base64
 import os
 
 import helpers
@@ -11,6 +9,7 @@ requests.packages.urllib3.disable_warnings()
 
 _global = helpers.get_global()
 logger = helpers.get_logger()
+
 
 def _nexus_auth():
     # import HTTPBasicAuth

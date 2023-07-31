@@ -1,5 +1,4 @@
 import click
-import os
 import requests
 
 import helpers
@@ -8,6 +7,7 @@ import common
 
 # Sonatype Nexus
 # --------------------
+
 
 @click.command()
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
