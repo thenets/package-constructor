@@ -6,6 +6,7 @@ import requests
 import datetime
 import time
 
+
 def _setup_logger():
     class ColoredFormatter(logging.Formatter):
         # Copied from https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
@@ -23,7 +24,7 @@ def _setup_logger():
             logging.INFO: grey + format + reset,
             logging.WARNING: yellow + format + reset,
             logging.ERROR: red + format + reset,
-            logging.CRITICAL: bold_red + format + reset
+            logging.CRITICAL: bold_red + format + reset,
         }
 
         def format(self, record):
@@ -72,10 +73,12 @@ def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
     )
     return out
 
+
 def check_output(args, **kwargs):
     """Run a command and return the output"""
     cmd_log(list(args))
     return subprocess.check_output(args, **kwargs)
+
 
 def check_executable(cmd: str) -> bool:
     """Check if a command is available"""
@@ -121,11 +124,11 @@ def get_services(repo_path: str):
             containers = json.loads(cmd_out.stdout)
             for container in containers:
                 service = {}
-                service['container_name'] = container["Names"][0]
-                service["network"]= container["Networks"][0]
+                service["container_name"] = container["Names"][0]
+                service["network"] = container["Networks"][0]
 
                 # Athens
-                if f"{podman_project_name}_athens_1" in service['container_name']:
+                if f"{podman_project_name}_athens_1" in service["container_name"]:
                     if container["State"] != "running":
                         logger.error("Athens is not running")
                         exit(1)
@@ -144,7 +147,7 @@ def get_services(repo_path: str):
                     services["athens"] = service
 
                 # Nexus
-                if f"{podman_project_name}_nexus_1" in service['container_name']:
+                if f"{podman_project_name}_nexus_1" in service["container_name"]:
                     if container["State"] != "running":
                         logger.error("Nexus is not running")
                         exit(1)
@@ -177,7 +180,7 @@ def get_services(repo_path: str):
                         exit(1)
 
                 # Cachito
-                if f"{podman_project_name}_cachito-api_1" in service['container_name']:
+                if f"{podman_project_name}_cachito-api_1" in service["container_name"]:
                     if container["State"] != "running":
                         logger.error("Cachito is not running")
                         exit(1)
@@ -196,7 +199,9 @@ def get_services(repo_path: str):
         # Except ConnectionError
         except:
             retries += 1
-            logger.warning(f"Failed {retries}/{total_retries}. Retrying in {sleep_time_seconds} seconds")
+            logger.warning(
+                f"Failed {retries}/{total_retries}. Retrying in {sleep_time_seconds} seconds"
+            )
             time.sleep(sleep_time_seconds)
 
     if retries == total_retries:

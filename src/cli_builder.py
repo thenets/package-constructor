@@ -8,7 +8,7 @@ _global = helpers.get_global()
 logger = helpers.get_logger()
 
 
-def _new_template_interceptor(container_file_path:str, services:dict) -> str:
+def _new_template_interceptor(container_file_path: str, services: dict) -> str:
     """Intercept the Containerfile and create a new one with the Cachito instructions.
 
     Returns:
@@ -31,31 +31,42 @@ def _new_template_interceptor(container_file_path:str, services:dict) -> str:
         if "#<cachito-proxy>" in line_clean:
             cachito_proxy_index = i
     if cachito_disable_index == -1:
-        logger.fatal("Cachito instructions not found in Containerfile. Aborting\n"
-        "├─ Please add the following line to your Containerfile:\n"
-        "├─ #<cachito-disable>")
+        logger.fatal(
+            "Cachito instructions not found in Containerfile. Aborting\n"
+            "├─ Please add the following line to your Containerfile:\n"
+            "├─ #<cachito-disable>"
+        )
         exit(1)
     if cachito_proxy_index == -1:
-        logger.fatal("Cachito instructions not found in Containerfile. Aborting\n"
-        "├─ Please add the following line to your Containerfile:\n"
-        "├─ #<cachito-proxy>")
+        logger.fatal(
+            "Cachito instructions not found in Containerfile. Aborting\n"
+            "├─ Please add the following line to your Containerfile:\n"
+            "├─ #<cachito-proxy>"
+        )
         exit(1)
 
     if cachito_disable_index > cachito_proxy_index:
-        logger.fatal("The '#<cachito-disable>' instruction must be before the '#<cachito-proxy>' instruction. Aborting")
+        logger.fatal(
+            "The '#<cachito-disable>' instruction must be before the '#<cachito-proxy>' instruction. Aborting"
+        )
         exit(1)
 
     # Create the template data
     template_data = {
-    "container_file_content_before_disable" : "\n".join(lines[:cachito_disable_index]),
-    "container_file_content_after_disable" : "\n".join(lines[cachito_disable_index+1:cachito_proxy_index]),
-    "container_file_content_after_proxy" : "\n".join(lines[cachito_proxy_index+1:])
+        "container_file_content_before_disable": "\n".join(
+            lines[:cachito_disable_index]
+        ),
+        "container_file_content_after_disable": "\n".join(
+            lines[cachito_disable_index + 1 : cachito_proxy_index]
+        ),
+        "container_file_content_after_proxy": "\n".join(
+            lines[cachito_proxy_index + 1 :]
+        ),
     }
-    template_data['custom_envs'] = {}
+    template_data["custom_envs"] = {}
     for service in services.values():
-        if 'custom_envs' in service.keys():
-            template_data['custom_envs'].update(service['custom_envs'])
-
+        if "custom_envs" in service.keys():
+            template_data["custom_envs"].update(service["custom_envs"])
 
     # Generate the new Containerfile
     template_string = """
@@ -75,7 +86,7 @@ ENV {{ k }}={{ v }}
 #<cachito-proxy> END
 {{ container_file_content_after_proxy }}
 """
-    template_env = jinja2.Environment(loader=jinja2.FileSystemLoader('.'))
+    template_env = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
     template = template_env.from_string(template_string)
     template_result = template.render(template_data)
 
@@ -83,9 +94,10 @@ ENV {{ k }}={{ v }}
     # TODO create new proxies instead of using the "cachito-pip-proxy"
     template_result = template_result.replace("<PIP_REPO_NAME>", "cachito-pip-proxy")
 
-
     # Write the new Containerfile
-    new_containerfile_path = os.path.abspath(os.path.join(os.path.dirname(container_file_path), "cachito.containerfile"))
+    new_containerfile_path = os.path.abspath(
+        os.path.join(os.path.dirname(container_file_path), "cachito.containerfile")
+    )
     logger.info("Writing new Containerfile to: " + new_containerfile_path)
     with open(new_containerfile_path, "w") as f:
         f.write(template_result)
@@ -122,7 +134,7 @@ def cmd_build(clone_path, file, build_context):
         exit(1)
 
     services = helpers.get_services(clone_path)
-    networks = [service['network'] for service in services.values()]
+    networks = [service["network"] for service in services.values()]
     if len(set(networks)) != 1:
         logger.error("All services must use the same network")
         exit(1)
@@ -137,18 +149,26 @@ def cmd_build(clone_path, file, build_context):
 
     try:
         import sys
-        stdout = sys.stdout
-        cmd_out = helpers.check_output(
-        ["podman", "build", "-f", new_file_abs, "--dns", "none", "-t", "test", build_context_abs], stderr=sys.stderr)
+
+        helpers.check_output(
+            [
+                "podman",
+                "build",
+                "-f",
+                new_file_abs,
+                "--dns",
+                "none",
+                "-t",
+                "test",
+                build_context_abs,
+            ],
+            stderr=sys.stderr,
+        )
     except:
         logger.error("Error building image. Aborting")
         exit(1)
 
     logger.info("Image built successfully")
-
-
-
-
 
 
 # Click
