@@ -1,6 +1,7 @@
 import click
 import cli_server
 import cli_builder
+import cli_nexus
 
 
 # main
@@ -13,7 +14,7 @@ if __name__ == "__main__":
 
     cli_server.click_add_group(cli)
     cli_builder.click_add_group(cli)
-    # TODO migrate "nexus" group
+    cli_nexus.click_add_group(cli)
     # TODO migrate "request" group
 
     cli()

@@ -50,7 +50,14 @@ logger = _setup_logger()
 
 
 def get_global() -> dict:
-    return {"cachito_git_url": "https://github.com/containerbuildsystem/cachito"}
+    return {
+        "cachito_git_url": "https://github.com/containerbuildsystem/cachito",
+        "nexus_auth": {"username": "cachito", "password": "cachito"},
+    }
+
+
+def print_json(j):
+    print(json.dumps(j, indent=4, sort_keys=True))
 
 
 def get_logger() -> logging.Logger:
@@ -138,8 +145,13 @@ def get_services(repo_path: str):
                         "host": container["Ports"][0]["host_port"],
                         "container": container["Ports"][0]["container_port"],
                     }
-                    service["url"] = f"http://localhost:{service['port']['host']}"
-                    r = requests.get(service["url"] + "/healthz")
+                    service[
+                        "url"
+                    ] = f"http://host.containers.internal:{service['port']['host']}"
+                    service["url_local"] = service["url"].replace(
+                        "host.containers.internal", "localhost"
+                    )
+                    r = requests.get(service["url_local"] + "/healthz")
                     if r.status_code != 200:
                         logger.error(f"Error connecting to Athens: {r.status_code}")
                         exit(1)
@@ -157,8 +169,13 @@ def get_services(repo_path: str):
                         "host": container["Ports"][0]["host_port"],
                         "container": container["Ports"][0]["container_port"],
                     }
-                    service["url"] = f"http://localhost:{service['port']['host']}"
-                    r = requests.get(service["url"])
+                    service[
+                        "url"
+                    ] = f"http://host.containers.internal:{service['port']['host']}"
+                    service["url_local"] = service["url"].replace(
+                        "host.containers.internal", "localhost"
+                    )
+                    r = requests.get(service["url_local"])
                     if r.status_code != 200:
                         logger.error(f"Error connecting to Nexus: {r.status_code}")
                         exit(1)
@@ -172,7 +189,7 @@ def get_services(repo_path: str):
                     nexus_user = "cachito"
                     nexus_pass = "cachito"
                     r = requests.get(
-                        service["url"] + "/service/rest/v1/repositories",
+                        service["url_local"] + "/service/rest/v1/repositories",
                         auth=(nexus_user, nexus_pass),
                     )
                     if r.status_code != 200:
@@ -190,8 +207,13 @@ def get_services(repo_path: str):
                         "host": container["Ports"][0]["host_port"],
                         "container": container["Ports"][0]["container_port"],
                     }
-                    service["url"] = f"http://localhost:{service['port']['host']}"
-                    r = requests.get(service["url"] + "/api/v1/status/short")
+                    service[
+                        "url"
+                    ] = f"http://host.containers.internal:{service['port']['host']}"
+                    service["url_local"] = service["url"].replace(
+                        "host.containers.internal", "localhost"
+                    )
+                    r = requests.get(service["url_local"] + "/api/v1/status/short")
                     if r.status_code != 200:
                         logger.error(f"Error connecting to Cachito: {r.status_code}")
                         exit(1)

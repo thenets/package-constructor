@@ -4,8 +4,8 @@ import click
 
 import json as json_lib
 import base64
-import os
-import sys
+
+import helpers
 
 # %% Setup session
 requests_s = requests.Session()
@@ -13,21 +13,13 @@ requests_s.verify = False
 requests.packages.urllib3.disable_warnings()
 
 # %% Main vars
+# TODO clean this up
 cachito_url = None
 nexus_url = None
 cert_url = None
 
-
-def config_validate_vars():
-    if not cachito_url:
-        print("CACHITO_URL is not set")
-        sys.exit(1)
-    if not nexus_url:
-        print("NEXUS_URL is not set")
-        sys.exit(1)
-    if not cert_url:
-        print("CERT_URL is not set")
-        sys.exit(1)
+_global = helpers.get_global()
+logger = helpers.get_logger()
 
 
 # %% Helpers
@@ -260,112 +252,6 @@ def cmd_cachito_download(request_id, output_dir):
         # print("Done")
     else:
         print("Error generating 'cachito.env' file")
-
-
-# Sonatype Nexus
-# --------------------
-def _nexus_auth():
-    # import HTTPBasicAuth
-    from requests.auth import HTTPBasicAuth
-
-    # Get credentials from env vars
-    _user = os.getenv("NEXUS_USER")
-    _pass = os.getenv("NEXUS_PASS")
-
-    if _user is None or _pass is None:
-        print("Error: NEXUS_USER or NEXUS_PASS not set")
-        sys.exit(1)
-
-    return HTTPBasicAuth(_user, _pass)
-
-
-@click.command()
-@click.option("--json", default=False, is_flag=True, help="Print JSON")
-def cmd_nexus_list_repos(json):
-    """List Nexus repositories"""
-
-    r = requests.get(
-        f"{nexus_url}/service/rest/v1/repositories",
-        auth=_nexus_auth(),
-    )
-    if r.status_code == 200:
-        if json:
-            helper_print_json(r.json())
-        else:
-            print("Repositories:")
-            for item in r.json():
-                print(f"  - {item['name']}")
-    else:
-        print(f"Error: {r.status_code}")
-
-
-@click.command()
-@click.argument("repo_name", type=str, required=True)
-@click.option("--json", default=False, is_flag=True, help="Print JSON")
-def cmd_nexus_list_components(repo_name, json):
-    """List components in a Nexus repository"""
-
-    def _pag_request(cont_token=None):
-        params = {
-            "repository": repo_name,
-        }
-        if cont_token:
-            params.update({"continuationToken": cont_token})
-        r = requests.get(
-            f"{nexus_url}/service/rest/v1/components",
-            params=params,
-            auth=_nexus_auth(),
-        )
-        return r
-
-    # pagination using 'continuationToken'
-    full_items = []
-    cont_token = None
-    while True:
-        r = _pag_request(cont_token)
-
-        if r.status_code == 200:
-            full_items = full_items + r.json()["items"]
-        else:
-            print(f"Error: {r.status_code}")
-
-        cont_token = r.json()["continuationToken"]
-
-        if not cont_token:
-            break
-
-    if json:
-        helper_print_json(full_items)
-    else:
-        print("Components:")
-        components = full_items
-        # sort by name
-        components = sorted(components, key=lambda k: k["name"])
-        for component in components:
-            print(f"  - {component['name']}=={component['version']}")
-
-
-@click.command()
-@click.argument("repo_name", type=str, required=True)
-@click.option("--json", default=False, is_flag=True, help="Print JSON")
-def cmd_nexus_describe_repo(repo_name, json):
-    """List packages in a Nexus repository"""
-
-    r = requests.get(
-        f"{nexus_url}/service/rest/v1/repositories/{repo_name}/",
-        auth=_nexus_auth(),
-    )
-    if r.status_code == 200:
-        if json:
-            helper_print_json(r.json())
-        else:
-            print(f"Repository: {repo_name}")
-            item = r.json()
-            print(f"  - Name: {item['name']}")
-            print(f"  - Type: {item['type']}")
-            print(f"  - URL : {item['url']}")
-    else:
-        print(f"Error: {r.status_code}")
 
 
 # @click.group()
