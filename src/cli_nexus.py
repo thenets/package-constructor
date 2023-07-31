@@ -3,24 +3,11 @@ import os
 import requests
 
 import helpers
+import common
 
 
 # Sonatype Nexus
 # --------------------
-def _nexus_auth():
-    # import HTTPBasicAuth
-    from requests.auth import HTTPBasicAuth
-
-    # Get credentials from env vars
-    _user = os.getenv("NEXUS_USER")
-    _pass = os.getenv("NEXUS_PASS")
-
-    if _user is None or _pass is None:
-        print("Error: NEXUS_USER or NEXUS_PASS not set")
-        exit(1)
-
-    return HTTPBasicAuth(_user, _pass)
-
 
 @click.command()
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
@@ -37,7 +24,7 @@ def cmd_nexus_list_repos(clone_path, json):
 
     r = requests.get(
         f"{nexus_url}/service/rest/v1/repositories",
-        auth=_nexus_auth(),
+        auth=common._nexus_auth(),
     )
     if r.status_code == 200:
         if json:
@@ -73,7 +60,7 @@ def cmd_nexus_list_components(clone_path, repo_name, json):
         r = requests.get(
             f"{nexus_url}/service/rest/v1/components",
             params=params,
-            auth=_nexus_auth(),
+            auth=common._nexus_auth(),
         )
         return r
 
@@ -120,7 +107,7 @@ def cmd_nexus_describe_repo(clone_path, repo_name, json):
 
     r = requests.get(
         f"{nexus_url}/service/rest/v1/repositories/{repo_name}/",
-        auth=_nexus_auth(),
+        auth=common._nexus_auth(),
     )
     if r.status_code == 200:
         if json:

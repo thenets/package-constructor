@@ -1,26 +1,17 @@
-# %% Import libs
+import json as json_lib
 import requests
 import click
-
-import json as json_lib
 import base64
 
-import helpers
+# TODO refactor this entire file
+
+cachito_url = ""
+cert_url = ""
 
 # %% Setup session
 requests_s = requests.Session()
 requests_s.verify = False
 requests.packages.urllib3.disable_warnings()
-
-# %% Main vars
-# TODO clean this up
-cachito_url = None
-nexus_url = None
-cert_url = None
-
-_global = helpers.get_global()
-logger = helpers.get_logger()
-
 
 # %% Helpers
 def config_replace_content(content: str):
@@ -65,8 +56,6 @@ def helper_print_json(j):
 
 
 # %% CLI
-
-
 @click.command()
 @click.option("--repo", default=None, help="Repository URL")
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
@@ -252,29 +241,3 @@ def cmd_cachito_download(request_id, output_dir):
         # print("Done")
     else:
         print("Error generating 'cachito.env' file")
-
-
-# @click.group()
-# def cli():
-#     pass
-
-# @click.group()
-# def request():
-#     pass
-
-# cli.add_command(request)
-# request.add_command(list)
-# request.add_command(describe)
-# request.add_command(logs)
-# request.add_command(configuration_files)
-# request.add_command(new)
-# request.add_command(download)
-
-# @click.group()
-# def nexus():
-#     pass
-
-# cli.add_command(nexus)
-# nexus.add_command(list_repos)
-# nexus.add_command(list_components)
-# nexus.add_command(describe_repo)
