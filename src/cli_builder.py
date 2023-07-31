@@ -161,9 +161,20 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
     "-c",
     help="Path to the build context. Defaults to the directory of the Containerfile",
 )
-def cmd_build(clone_path, file, build_context):
+# --no-cache
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    default=False,
+    help="Do not use cache when building the container image (default: False)",
+)
+def cmd_build(clone_path, file, build_context, no_cache):
     """Build a container image using Cachito servers"""
     _build_validate(file, build_context)
+
+    additional_args = []
+    if no_cache:
+        additional_args.append("--no-cache")
 
     services = helpers.get_services(clone_path)
     networks = [service["network"] for service in services.values()]
@@ -180,17 +191,22 @@ def cmd_build(clone_path, file, build_context):
     new_file_abs = _new_template_interceptor(file_abs, services)
 
     try:
-        command = [
-            "podman",
-            "build",
-            "-f",
-            new_file_abs,
-            "--dns",
-            "none",
-            "-t",
-            "test",
-            build_context_abs,
-        ]
+        command = (
+            [
+                "podman",
+                "build",
+                "-f",
+                new_file_abs,
+                "--dns",
+                "none",
+            ]
+            + additional_args
+            + [
+                "-t",
+                "test",
+                build_context_abs,
+            ]
+        )
         helpers.cmd_log(command)
         rc = os.system(" ".join(command))
         if rc != 0:

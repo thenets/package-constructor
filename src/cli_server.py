@@ -128,9 +128,9 @@ def cmd_start(clone_path):
     # Print status
     services = helpers.get_services(clone_path_abs)
     print("All services are operational")
-    print(f"  Athens  : {services['athens']['url']}")
-    print(f"  Nexus   : {services['nexus']['url']}")
-    print(f"  Cachito : {services['cachito']['url']}")
+    print(f"  Athens  : {services['athens']['url_local']}")
+    print(f"  Nexus   : {services['nexus']['url_local']}")
+    print(f"  Cachito : {services['cachito']['url_local']}")
     print("")
 
 
@@ -184,9 +184,9 @@ def cmd_status(clone_path):
     logger.info("Retrieving Cachito server containers list")
     services = helpers.get_services(clone_path_abs)
     print("All services are operational")
-    print(f"  Athens  : {services['athens']['url']}")
-    print(f"  Nexus   : {services['nexus']['url']}")
-    print(f"  Cachito : {services['cachito']['url']}")
+    print(f"  Athens  : {services['athens']['url_local']}")
+    print(f"  Nexus   : {services['nexus']['url_local']}")
+    print(f"  Cachito : {services['cachito']['url_local']}")
     print("")
 
 
