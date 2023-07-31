@@ -1,3 +1,4 @@
+import time
 import click
 import helpers
 import os
@@ -121,6 +122,16 @@ def cmd_start(clone_path):
 
     # Start the services
     helpers.run(["podman-compose", "up", "-d"], cwd=clone_path_abs)
+    logger.info("Waiting for services to be operational. Sleeping for 30 seconds")
+    time.sleep(30)
+
+    # Print status
+    services = helpers.get_services(clone_path_abs)
+    print("All services are operational")
+    print(f"  Athens  : {services['athens']['url']}")
+    print(f"  Nexus   : {services['nexus']['url']}")
+    print(f"  Cachito : {services['cachito']['url']}")
+    print("")
 
 
 @click.command()
@@ -169,10 +180,9 @@ def cmd_status(clone_path):
         logger.error("Cachito repository does not exist")
         exit(1)
 
+    # Print status
     logger.info("Retrieving Cachito server containers list")
     services = helpers.get_services(clone_path_abs)
-
-    # Print status
     print("All services are operational")
     print(f"  Athens  : {services['athens']['url']}")
     print(f"  Nexus   : {services['nexus']['url']}")
