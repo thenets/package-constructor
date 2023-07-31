@@ -59,17 +59,17 @@ def _interceptor(container_file_path:str, services:dict) -> str:
 
     # Generate the new Containerfile
     template_string = """
-{{- container_file_content_before_disable }}
+{{ container_file_content_before_disable }}
 #<cachito-disable> BEGIN
-RUN set -x \
-    && echo "nameserver 1.1.1.1" > /etc/resolv.conf \
+RUN set -x \\
+    && echo "nameserver 1.1.1.1" > /etc/resolv.conf \\
     && echo "nameserver 8.8.8.8" > /etc/resolv.conf
 #<cachito-disable> END
 {{ container_file_content_after_disable }}
 #<cachito-proxy> BEGIN
-RUN set -x \
-    rm -f /etc/resolv.conf
-{% for k, v in custom_envs.items() -%}
+RUN set -x \\
+    && rm -f /etc/resolv.conf
+{% for k, v in custom_envs.items() %}
 ENV {{ k }}={{ v }}
 {%- endfor %}
 #<cachito-proxy> END
