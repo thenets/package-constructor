@@ -64,14 +64,18 @@ def cmd_log(cmd: list, cwd: str = None) -> None:
     logger.debug(out)
 
 
-def run(cmd: list, cwd=None) -> subprocess.CompletedProcess:
+def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
     """Run a command"""
     cmd_log(cmd, cwd=cwd)
     out = subprocess.run(
-        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
     )
     return out
 
+def check_output(args, **kwargs):
+    """Run a command and return the output"""
+    cmd_log(list(args))
+    return subprocess.check_output(args, **kwargs)
 
 def check_executable(cmd: str) -> bool:
     """Check if a command is available"""
@@ -135,7 +139,7 @@ def get_services(repo_path: str):
                         logger.error(f"Error connecting to Athens: {r.status_code}")
                         exit(1)
                     service["custom_envs"] = {
-                        "GOPROXY": f"http://{service['container_name']}:{service['port']['container']}",
+                        "GOPROXY": f"http://host.containers.internal:{service['port']['host']}",
                     }
                     services["athens"] = service
 
@@ -154,8 +158,9 @@ def get_services(repo_path: str):
                         logger.error(f"Error connecting to Nexus: {r.status_code}")
                         exit(1)
                     service["custom_envs"] = {
-                        "PIP_INDEX": f"http://{service['container_name']}:{service['port']['container']}/repository/<PIP_REPO_NAME>/pypi",
-                        "PIP_INDEX_URL": f"http://{service['container_name']}:{service['port']['container']}/repository/<PIP_REPO_NAME>/simple",
+                        "PIP_TRUSTED_HOST": f"host.containers.internal:{service['port']['host']}",
+                        "PIP_INDEX": f"http://cachito:cachito@host.containers.internal:{service['port']['host']}/repository/<PIP_REPO_NAME>/pypi",
+                        "PIP_INDEX_URL": f"http://cachito:cachito@host.containers.internal:{service['port']['host']}/repository/<PIP_REPO_NAME>/simple",
                     }
                     services["nexus"] = service
                     # Test nexus credentials

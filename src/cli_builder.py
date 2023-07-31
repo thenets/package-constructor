@@ -8,8 +8,8 @@ _global = helpers.get_global()
 logger = helpers.get_logger()
 
 
-def _interceptor(container_file_path:str, services:dict) -> str:
-    """Intercept the Containerfile and add the Cachito instructions
+def _new_template_interceptor(container_file_path:str, services:dict) -> str:
+    """Intercept the Containerfile and create a new one with the Cachito instructions.
 
     Returns:
         str: The path to the new Containerfile
@@ -61,14 +61,14 @@ def _interceptor(container_file_path:str, services:dict) -> str:
     template_string = """
 {{ container_file_content_before_disable }}
 #<cachito-disable> BEGIN
-RUN set -x \\
-    && echo "nameserver 1.1.1.1" > /etc/resolv.conf \\
-    && echo "nameserver 8.8.8.8" > /etc/resolv.conf
+# RUN set -x \\
+#     && echo "nameserver 1.1.1.1" > /etc/resolv.conf \\
+#     && echo "nameserver 8.8.8.8" > /etc/resolv.conf
 #<cachito-disable> END
 {{ container_file_content_after_disable }}
 #<cachito-proxy> BEGIN
-RUN set -x \\
-    && rm -f /etc/resolv.conf
+#RUN set -x \\
+#    && rm -f /etc/resolv.conf
 {% for k, v in custom_envs.items() %}
 ENV {{ k }}={{ v }}
 {%- endfor %}
@@ -79,13 +79,19 @@ ENV {{ k }}={{ v }}
     template = template_env.from_string(template_string)
     template_result = template.render(template_data)
 
+    # Add new proxies to template_result
+    # TODO create new proxies instead of using the "cachito-pip-proxy"
+    template_result = template_result.replace("<PIP_REPO_NAME>", "cachito-pip-proxy")
+
+
     # Write the new Containerfile
     new_containerfile_path = os.path.abspath(os.path.join(os.path.dirname(container_file_path), "cachito.containerfile"))
     logger.info("Writing new Containerfile to: " + new_containerfile_path)
     with open(new_containerfile_path, "w") as f:
         f.write(template_result)
 
-    exit(0)
+    return new_containerfile_path
+
 
 @click.command()
 @click.option(
@@ -117,6 +123,9 @@ def cmd_build(clone_path, file, build_context):
 
     services = helpers.get_services(clone_path)
     networks = [service['network'] for service in services.values()]
+    if len(set(networks)) != 1:
+        logger.error("All services must use the same network")
+        exit(1)
 
     file_abs = os.path.abspath(file)
     if build_context:
@@ -124,16 +133,18 @@ def cmd_build(clone_path, file, build_context):
     else:
         build_context_abs = os.path.dirname(file_abs)
 
-    _interceptor(file_abs, services)
+    new_file_abs = _new_template_interceptor(file_abs, services)
 
-    # TODO add env file creation
-    # TODO add limited DNS resolution
-
-    cmd_out = helpers.run(["podman", "build", "-f", file_abs, "-t", "test", build_context_abs])
-    if cmd_out.returncode != 0:
-        logger.error("Error building container image")
+    try:
+        import sys
+        stdout = sys.stdout
+        cmd_out = helpers.check_output(
+        ["podman", "build", "-f", new_file_abs, "-t", "test", build_context_abs], stderr=sys.stderr)
+    except:
+        logger.error("Error building image. Aborting")
         exit(1)
-    print(cmd_out.stdout.decode("utf-8"))
+
+    logger.info("Image built successfully")
 
 
 
