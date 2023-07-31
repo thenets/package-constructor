@@ -161,14 +161,19 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
     "-c",
     help="Path to the build context. Defaults to the directory of the Containerfile",
 )
-# --no-cache
+@click.option(
+    "--tag",
+    "-t",
+    required=True,
+    help="Tag to apply to the built image"
+)
 @click.option(
     "--no-cache",
     is_flag=True,
     default=False,
     help="Do not use cache when building the container image (default: False)",
 )
-def cmd_build(clone_path, file, build_context, no_cache):
+def cmd_build(clone_path, file, build_context, tag, no_cache):
     """Build a container image using Cachito servers"""
     _build_validate(file, build_context)
 
@@ -203,7 +208,7 @@ def cmd_build(clone_path, file, build_context, no_cache):
             + additional_args
             + [
                 "-t",
-                "test",
+                "tag",
                 build_context_abs,
             ]
         )
