@@ -7,13 +7,35 @@ import datetime
 import time
 
 def _setup_logger():
+    class ColoredFormatter(logging.Formatter):
+        # Copied from https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
+        grey = "\x1b[38;20m"
+        yellow = "\x1b[33;20m"
+        red = "\x1b[31;20m"
+        bold_red = "\x1b[31;1m"
+        reset = "\x1b[0m"
+
+        format = "%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s"
+        # format = "%(asctime)s %(name)s %(levelname)s %(message)s (%(filename)s:%(lineno)d)"
+
+        FORMATS = {
+            logging.DEBUG: grey + format + reset,
+            logging.INFO: grey + format + reset,
+            logging.WARNING: yellow + format + reset,
+            logging.ERROR: red + format + reset,
+            logging.CRITICAL: bold_red + format + reset
+        }
+
+        def format(self, record):
+            log_fmt = self.FORMATS.get(record.levelno)
+            formatter = logging.Formatter(log_fmt)
+            return formatter.format(record)
+
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s", datefmt="%H:%M:%S"
-    )
+    formatter = ColoredFormatter()
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     logger.debug("- Starting Cachito CLI -")
@@ -96,6 +118,7 @@ def get_services(repo_path: str):
             for container in containers:
                 service = {}
                 service['container_name'] = container["Names"][0]
+                service["network"]= container["Networks"][0]
 
                 # Athens
                 if f"{podman_project_name}_athens_1" in service['container_name']:
@@ -111,6 +134,9 @@ def get_services(repo_path: str):
                     if r.status_code != 200:
                         logger.error(f"Error connecting to Athens: {r.status_code}")
                         exit(1)
+                    service["custom_envs"] = {
+                        "GOPROXY": f"http://{service['container_name']}:{service['port']['container']}",
+                    }
                     services["athens"] = service
 
                 # Nexus
@@ -127,6 +153,10 @@ def get_services(repo_path: str):
                     if r.status_code != 200:
                         logger.error(f"Error connecting to Nexus: {r.status_code}")
                         exit(1)
+                    service["custom_envs"] = {
+                        "PIP_INDEX": f"http://{service['container_name']}:{service['port']['container']}/repository/<PIP_REPO_NAME>/pypi",
+                        "PIP_INDEX_URL": f"http://{service['container_name']}:{service['port']['container']}/repository/<PIP_REPO_NAME>/simple",
+                    }
                     services["nexus"] = service
                     # Test nexus credentials
                     nexus_user = "cachito"
@@ -164,7 +194,7 @@ def get_services(repo_path: str):
             logger.warning(f"Failed {retries}/{total_retries}. Retrying in {sleep_time_seconds} seconds")
             time.sleep(sleep_time_seconds)
 
-    if retries == 0:
+    if retries == total_retries:
         logger.fatal("All retries failed. Services are not available")
         exit(1)
 

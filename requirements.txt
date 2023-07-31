@@ -2,3 +2,4 @@ requests
 click
 openapi-python-client
 PyYAML
+Jinja2
