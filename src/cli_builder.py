@@ -105,6 +105,7 @@ ENV {{ k }}={{ v }}
 
     return new_containerfile_path
 
+
 def _build_validate(file, build_context):
     """Validate the build parameters"""
 
@@ -140,6 +141,7 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
     )
     logger.info("Retrieving: " + python_requirements_file_path)
     _generate_python_requirements_file(repo_data, python_requirements_file_path)
+
 
 @click.command()
 @click.option(
