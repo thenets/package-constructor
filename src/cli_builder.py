@@ -81,6 +81,7 @@ RUN set -x \\
 #<cachito-proxy> BEGIN
 RUN set -x \\
     && rm -f /etc/resolv.conf
+ENV PIP_NO_BINARY=:all:
 {% for k, v in custom_envs.items() %}
 ENV {{ k }}={{ v }}
 {%- endfor %}
@@ -208,7 +209,7 @@ def cmd_build(clone_path, file, build_context, tag, no_cache):
             + additional_args
             + [
                 "-t",
-                "tag",
+                tag,
                 build_context_abs,
             ]
         )
