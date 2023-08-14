@@ -1,6 +1,17 @@
 # Cachito CLI
 
-All you need to build packages and applications in an air-gapped environment.
+All you need to build packages and applications in an air-gapped environment. The power of `cachito` and `podman` combined.
+
+## Why was this project created?
+
+- My pain: it takes too long to iterate in an air-gapped Jenkins or any other pipeline. The flow of committing to a git repo and triggering a job in a CI tool it's not a productive solution.
+
+- My problem: I need a faster way to iterate and build a container, a portion with internet access and a portion without internet access. I also need to extract all Python dependencies downloaded, including the hidden ones, like `build`, `hatch`, `hacther`, etc.
+
+- The goal of this project: build a container image with a section with internet and another without internet + using Cachito proxies. It also extracts all Python dependencies that passed
+through the Cachito proxy (Nexus pip proxy repo).
+
+- Result: this way, I can iterate fast and retrieve dependencies that `pip freeze` don't return.
 
 ## Features
 
@@ -16,7 +27,7 @@ Additional features:
 Pending features:
 
 - Configuration system via JSON/YAML
-- Cachito: removed. Pending to be refactored
+- Cachito: removed. Pending to be refactored. Probably this should be integrated with the `cachi2` project.
 
 
 ## How to use
@@ -77,3 +88,11 @@ Build a package:
 cat ./path/to/cachito.containerfile
 cat ./path/to/requirements.txt
 ```
+
+## FAQ
+
+- Is this solution too focused on Python packaging?
+  Yes. There are probably design issues in how I architected the `cli_builder.py` module.
+
+- How do you deal with third-party bindings like `C`, `C++` or `Rust`?
+  I don't. All binding dependencies must come from the distro's package manager. For `Rust` specifically, none is supported since `cachito` don't yet support it.
