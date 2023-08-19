@@ -1,9 +1,10 @@
-import click
 import os
+
+import click
 import jinja2
 
-import helpers
 import common
+import helpers
 
 _global = helpers.get_global()
 logger = helpers.get_logger()
@@ -162,12 +163,7 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
     "-c",
     help="Path to the build context. Defaults to the directory of the Containerfile",
 )
-@click.option(
-    "--tag",
-    "-t",
-    required=True,
-    help="Tag to apply to the built image"
-)
+@click.option("--tag", "-t", required=True, help="Tag to apply to the built image")
 @click.option(
     "--no-cache",
     is_flag=True,
