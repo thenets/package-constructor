@@ -7,6 +7,7 @@ clean:
 	rm -rf venv/
 
 fmt: venv
+	./venv/bin/isort ./src/
 	./venv/bin/black -q ./src/
 	./venv/bin/ruff --fix ./src/
 

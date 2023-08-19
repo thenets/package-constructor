@@ -2,3 +2,4 @@
 black
 ruff
 pytest
+isort
