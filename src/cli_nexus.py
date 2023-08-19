@@ -1,9 +1,8 @@
 import click
 import requests
 
-import helpers
 import common
-
+import helpers
 
 # Sonatype Nexus
 # --------------------

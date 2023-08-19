@@ -1,10 +1,11 @@
-import logging
-import subprocess
-import os
-import json
-import requests
 import datetime
+import json
+import logging
+import os
+import subprocess
 import time
+
+import requests
 
 
 def _setup_logger():

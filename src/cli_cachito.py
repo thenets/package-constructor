@@ -1,7 +1,8 @@
-import json as json_lib
-import requests
-import click
 import base64
+import json as json_lib
+
+import click
+import requests
 
 # TODO refactor this entire file
 
