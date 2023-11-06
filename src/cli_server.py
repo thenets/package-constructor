@@ -10,7 +10,6 @@ _global = helpers.get_global()
 logger = helpers.get_logger()
 
 
-
 def _check_dependencies():
     # Check podman
     if not helpers.check_executable("podman"):
@@ -36,6 +35,7 @@ def _get_compose_file_data(cachito_repo_path: str):
     with open(os.path.join(cachito_repo_path, compose_file), "r") as f:
         compose_data = yaml.safe_load(f)
     return compose_data
+
 
 def start(cachito_repo_path: str):
     """Start the Cachito server if is not running
@@ -105,6 +105,7 @@ def start(cachito_repo_path: str):
     logger.info("Services are operational")
     return services
 
+
 def stop(cachito_repo_path: str):
     # Basic checks
     _check_dependencies()
@@ -133,6 +134,7 @@ def restart(cachito_repo_path: str):
     else:
         logger.info("Starting Cachito server")
         start(cachito_repo_path)
+
 
 @click.command()
 @click.option(
@@ -168,6 +170,7 @@ def cmd_stop(clone_path):
 
     stop(cachito_repo_path)
 
+
 @click.command()
 @click.option(
     "--clone-path",
@@ -193,8 +196,6 @@ def cmd_status(clone_path):
     print(f"  Nexus   : {services['nexus']['url_local']}")
     print(f"  Cachito : {services['cachito']['url_local']}")
     print("")
-
-
 
 
 # Click

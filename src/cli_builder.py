@@ -134,7 +134,9 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
         dependencies_list = []
         for dependency in repo_data["dependencies"]:
             if dependency["format"] == "pypi":
-                dependencies_list.append(f"{dependency['name']}=={dependency['version']}")
+                dependencies_list.append(
+                    f"{dependency['name']}=={dependency['version']}"
+                )
         dependencies_list.sort()
 
         out = ""
@@ -286,7 +288,6 @@ def cmd_pip_generate(requirements_file_in, requirements_file_out):
     # Check if server is running, start OR restart if needed
     cli_server._check_dependencies()
 
-
     requirements_file_in_abs = os.path.abspath(requirements_file_in)
     requirements_file_out_abs = os.path.abspath(requirements_file_out)
 
@@ -308,6 +309,7 @@ def cmd_pip_generate(requirements_file_in, requirements_file_out):
         out += f"{dependency}\n"
     with open(requirements_file_out_abs, "w") as f:
         f.write(out)
+
 
 # Click
 # ====================

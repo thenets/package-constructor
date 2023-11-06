@@ -240,13 +240,16 @@ def get_services(cachito_repo_path: str):
 
     return services
 
+
 def get_cache_dir():
     default_cache_dir = "./cache"
     return os.path.abspath(default_cache_dir)
 
+
 def get_default_cachito_repo_path():
     default_cachito_repo_path = "./cache/cachito_repo"
     return os.path.abspath(default_cachito_repo_path)
+
 
 def is_running(cachito_repo_path: str) -> bool:
     """Check if the services are running"""
@@ -259,6 +262,7 @@ def is_running(cachito_repo_path: str) -> bool:
             return False
     return True
 
+
 def cachito_repo_exists(cachito_repo_path: str):
     """Check if the Cachito repository already exists
 
@@ -267,7 +271,9 @@ def cachito_repo_exists(cachito_repo_path: str):
               False if the Cachito repository does not exist but the path is valid
     """
     if not os.path.isdir(os.path.dirname(cachito_repo_path)):
-        logger.error("Parent directory does not exist: " + os.path.dirname(cachito_repo_path))
+        logger.error(
+            "Parent directory does not exist: " + os.path.dirname(cachito_repo_path)
+        )
         exit(1)
     if os.path.isdir(cachito_repo_path):
         if os.path.join(cachito_repo_path, ".git"):

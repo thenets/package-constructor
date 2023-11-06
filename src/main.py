@@ -2,8 +2,8 @@ import click
 
 import cli_builder
 import cli_nexus
-import cli_server
 import cli_pip
+import cli_server
 
 # main
 # --------------------

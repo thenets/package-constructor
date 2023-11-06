@@ -1,14 +1,12 @@
 import os
-import time
 
 import click
-import yaml
 
+import cli_server
 import helpers
 
 _global = helpers.get_global()
 logger = helpers.get_logger()
-import cli_server
 
 
 def _check_dependencies():
@@ -43,6 +41,7 @@ def cmd_status(clone_path):
     else:
         print("Some services are not operational")
 
+
 @click.command()
 @click.option(
     "--clone-path",
@@ -68,7 +67,9 @@ def cmd_status(clone_path):
     is_flag=True,
     help="Restart the Cachito server to clean the cache",
 )
-def cmd_extract_dependencies(clone_path, requirements_in, requirements_out, restart_server):
+def cmd_extract_dependencies(
+    clone_path, requirements_in, requirements_out, restart_server
+):
     """From requirements-in.txt, extract the dependencies and write them to requirements-out.txt"""
     clone_path_abs = os.path.abspath(clone_path)
     pip_cache_dir = os.path.join(helpers.get_cache_dir(), "pip-extract")
@@ -121,7 +122,8 @@ RUN set -x \
     && mkdir -p /build \
     && pip install -r /build/requirements-in.txt \
     && pip freeze > /build/requirements-out.txt
-""")
+"""
+        )
 
     # Copy the requirements-in.txt file to the cache dir
     logger.info("Copying requirements-in.txt to the cache dir")
@@ -133,23 +135,20 @@ RUN set -x \
     # Build the container
     logger.info("Building the container (no dns)")
     cmd = [
-            "podman",
-            "build",
-            "-f",
-            os.path.join(pip_cache_dir, "Containerfile"),
-            "--no-cache",
-            "--dns",
-            "none",
-            pip_cache_dir,
-        ]
+        "podman",
+        "build",
+        "-f",
+        os.path.join(pip_cache_dir, "Containerfile"),
+        "--no-cache",
+        "--dns",
+        "none",
+        pip_cache_dir,
+    ]
     helpers.cmd_log(
         cmd,
         cwd=pip_cache_dir,
     )
     os.system(" ".join(cmd))
-
-
-
 
 
 # Click
