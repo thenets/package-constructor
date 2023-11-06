@@ -91,7 +91,7 @@ def cmd_extract_dependencies(clone_path, requirements_in, requirements_out, rest
 
     # Create a Containerfile with the cachito proxy
     logger.info("Creating Containerfile")
-    containerfile_path = os.path.join(clone_path_abs, "Containerfile")
+    containerfile_path = os.path.join(pip_cache_dir, "Containerfile")
     with open(containerfile_path, "w") as f:
         f.write(
             """FROM registry.redhat.io/rhel9/python-311
@@ -122,7 +122,6 @@ RUN set -x \
     && pip install -r /build/requirements-in.txt \
     && pip freeze > /build/requirements-out.txt
 """)
-    # write
 
     # Copy the requirements-in.txt file to the cache dir
     logger.info("Copying requirements-in.txt to the cache dir")
@@ -133,8 +132,7 @@ RUN set -x \
 
     # Build the container
     logger.info("Building the container (no dns)")
-    helpers.run(
-        [
+    cmd = [
             "podman",
             "build",
             "-f",
@@ -143,9 +141,12 @@ RUN set -x \
             "--dns",
             "none",
             pip_cache_dir,
-        ],
+        ]
+    helpers.cmd_log(
+        cmd,
         cwd=pip_cache_dir,
     )
+    os.system(" ".join(cmd))
 
 
 
