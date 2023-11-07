@@ -36,7 +36,7 @@ def _check_requirements_file_output(requirements_out) -> None:
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_status(clone_path):
@@ -62,19 +62,19 @@ def cmd_status(clone_path):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(
     "--requirements-in",
     "-i",
-    default="./requirements-in.txt",
+    required=True,
     help="Path to the input requirements file",
 )
 @click.option(
     "--requirements-out",
     "-o",
-    default="./requirements-out.txt",
+    required=True,
     help="Path to the output requirements file",
 )
 @click.option(
@@ -172,7 +172,7 @@ RUN set -x \
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(

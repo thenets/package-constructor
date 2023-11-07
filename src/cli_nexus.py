@@ -1,3 +1,5 @@
+import os
+
 import click
 import requests
 
@@ -13,7 +15,7 @@ import helpers
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_nexus_list_repos(clone_path, json):
@@ -42,7 +44,7 @@ def cmd_nexus_list_repos(clone_path, json):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_nexus_list_components(clone_path, repo_name, json):
@@ -96,7 +98,7 @@ def cmd_nexus_list_components(clone_path, repo_name, json):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_nexus_describe_repo(clone_path, repo_name, json):

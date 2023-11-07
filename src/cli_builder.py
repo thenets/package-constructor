@@ -169,7 +169,7 @@ def dump_dependencies_from_cachito_pip_proxy_to_file(
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(
@@ -251,7 +251,7 @@ def cmd_build(clone_path, file, build_context, tag, no_cache):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(

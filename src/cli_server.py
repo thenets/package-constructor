@@ -140,7 +140,7 @@ def restart(cachito_repo_path: str):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path to clone the Cachito repository",
 )
 def cmd_start(clone_path):
@@ -161,7 +161,7 @@ def cmd_start(clone_path):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_stop(clone_path):
@@ -175,7 +175,7 @@ def cmd_stop(clone_path):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_status(clone_path):
