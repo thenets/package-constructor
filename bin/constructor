@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+venv_dir=${script_dir}/../venv
+
+# Create virtualenv if it doesn't exist
+if [ ! -d ${venv_dir} ]; then
+    cd ${script_dir}/..
+    make venv 1>/dev/null
+    cd -
+fi
+
+# Enable common virtualenv
+source ${venv_dir}/bin/activate
+
+# Source .env if file exists
+if [ -f .env ]; then
+    source ${script_dir}/../.env
+fi
+
+python ${script_dir}/../src/main.py $@
