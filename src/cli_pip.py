@@ -2,6 +2,7 @@ import os
 
 import click
 
+import cli_builder
 import cli_server
 import helpers
 
@@ -13,6 +14,21 @@ def _check_dependencies():
     # Check podman
     if not helpers.check_executable("podman"):
         logger.error("podman is not available in the PATH")
+        exit(1)
+
+
+def _check_requirements_file_output(requirements_out) -> None:
+    if requirements_out[0] != "/":
+        requirements_out = os.path.join(os.getcwd(), requirements_out)
+
+    try:
+        os.path.dirname(requirements_out)
+        if not os.path.isdir(os.path.dirname(requirements_out)):
+            exit(1)
+
+    except:
+        logger.error("Parent directory of requirements-out.txt does not exist")
+        logger.error(f"Parent directory: {os.path.dirname(requirements_out)}")
         exit(1)
 
 
@@ -95,8 +111,8 @@ def cmd_extract_dependencies(
     containerfile_path = os.path.join(pip_cache_dir, "Containerfile")
     with open(containerfile_path, "w") as f:
         f.write(
-            """FROM registry.redhat.io/rhel9/python-311
-USER root
+            """FROM registry-proxy.engineering.redhat.com/rh-osbs/ansible-automation-platform-24-ee-minimal-rhel9:1.0.0-371
+# USER root
 ADD ./requirements-in.txt /build/requirements-in.txt
 
 #<cachito-disable> BEGIN
@@ -105,11 +121,9 @@ RUN set -x \
     && echo "nameserver 8.8.8.8" > /etc/resolv.conf
 #<cachito-disable> END
 
-RUN pip install --upgrade pip
-
 #<cachito-proxy> BEGIN
-RUN set -x \
-    && rm -f /etc/resolv.conf
+#RUN set -x \
+#    && rm -f /etc/resolv.conf
 ENV PIP_NO_BINARY=:all:
 
 ENV GOPROXY=http://host.containers.internal:3000
@@ -118,21 +132,20 @@ ENV PIP_INDEX=http://cachito:cachito@host.containers.internal:8082/repository/ca
 ENV PIP_INDEX_URL=http://cachito:cachito@host.containers.internal:8082/repository/cachito-pip-proxy/simple
 #<cachito-proxy> END
 
+# RUN pip install -U pip setuptools
+
 RUN set -x \
     && mkdir -p /build \
-    && pip install -r /build/requirements-in.txt \
+    && pip install -vvvv -r /build/requirements-in.txt \
     && pip freeze > /build/requirements-out.txt
 """
         )
-
-    # Copy the requirements-in.txt file to the cache dir
     logger.info("Copying requirements-in.txt to the cache dir")
     requirements_in_abs = os.path.abspath(requirements_in)
     requirements_in_cache = os.path.join(pip_cache_dir, "requirements-in.txt")
     os.makedirs(pip_cache_dir, exist_ok=True)
     helpers.run(["cp", requirements_in_abs, requirements_in_cache])
 
-    # Build the container
     logger.info("Building the container (no dns)")
     cmd = [
         "podman",
@@ -150,6 +163,34 @@ RUN set -x \
     )
     os.system(" ".join(cmd))
 
+    cli_builder.dump_dependencies_from_cachito_pip_proxy_to_file(
+        clone_path, requirements_out
+    )
+
+
+@click.command()
+@click.option(
+    "--clone-path",
+    "-p",
+    default="./cache/cachito_repo",
+    help="Path where the Cachito repository is located",
+)
+@click.option(
+    "--requirements-out",
+    "-o",
+    required=True,
+    help="Path to the output requirements file",
+)
+def cmd_debug_proxy(clone_path, requirements_out):
+    """From requirements-in.txt, extract the dependencies and write them to requirements-out.txt"""
+    os.path.abspath(clone_path)
+
+    _check_requirements_file_output(requirements_out)
+
+    cli_builder.dump_dependencies_from_cachito_pip_proxy_to_file(
+        clone_path, requirements_out
+    )
+
 
 # Click
 # ====================
@@ -158,4 +199,5 @@ def click_add_group(cli: click.Group) -> None:
     cmd_pip = click.Group("pip", help="Pip server commands")
     cmd_pip.add_command(name="status", cmd=cmd_status)
     cmd_pip.add_command(name="extract-dependencies", cmd=cmd_extract_dependencies)
+    cmd_pip.add_command(name="debug-proxy", cmd=cmd_debug_proxy)
     cli.add_command(cmd_pip)

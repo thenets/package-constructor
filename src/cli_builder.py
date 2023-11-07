@@ -145,11 +145,24 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
         with open(python_requirements_file_path, "w") as f:
             f.write(out)
 
-    python_requirements_file_path = os.path.abspath(
-        os.path.join(os.path.dirname(file_abs), "requirements.txt")
-    )
+    if os.path.isdir(file_abs):
+        python_requirements_file_path = os.path.abspath(
+            os.path.join(os.path.dirname(file_abs), "requirements.txt")
+        )
+    else:
+        python_requirements_file_path = file_abs
     logger.info("Retrieving: " + python_requirements_file_path)
     _generate_python_requirements_file(repo_data, python_requirements_file_path)
+
+
+def dump_dependencies_from_cachito_pip_proxy_to_file(
+    cachito_repo_path: str,
+    requirements_out: str,
+):
+    """Dump the dependencies list from the Cachito pip proxy repo to a file"""
+    services = helpers.get_services(cachito_repo_path)
+    repo_data = common._nexus_get_repo_data(services, "cachito-pip-proxy")
+    _create_python_requirements_file(requirements_out, repo_data)
 
 
 @click.command()
