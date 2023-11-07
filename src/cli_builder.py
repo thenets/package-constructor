@@ -131,18 +131,38 @@ def _create_python_requirements_file(file_abs: str, repo_data: dict) -> None:
         python_requirements_file_path: str,
     ) -> None:
         """Generate a requirements.txt file for a Python project"""
-        out = ""
+        dependencies_list = []
         for dependency in repo_data["dependencies"]:
             if dependency["format"] == "pypi":
-                out += f"{dependency['name']}=={dependency['version']}\n"
+                dependencies_list.append(
+                    f"{dependency['name']}=={dependency['version']}"
+                )
+        dependencies_list.sort()
+
+        out = ""
+        for dependency in dependencies_list:
+            out += f"{dependency}\n"
         with open(python_requirements_file_path, "w") as f:
             f.write(out)
 
-    python_requirements_file_path = os.path.abspath(
-        os.path.join(os.path.dirname(file_abs), "requirements.txt")
-    )
+    if os.path.isdir(file_abs):
+        python_requirements_file_path = os.path.abspath(
+            os.path.join(os.path.dirname(file_abs), "requirements.txt")
+        )
+    else:
+        python_requirements_file_path = file_abs
     logger.info("Retrieving: " + python_requirements_file_path)
     _generate_python_requirements_file(repo_data, python_requirements_file_path)
+
+
+def dump_dependencies_from_cachito_pip_proxy_to_file(
+    cachito_repo_path: str,
+    requirements_out: str,
+):
+    """Dump the dependencies list from the Cachito pip proxy repo to a file"""
+    services = helpers.get_services(cachito_repo_path)
+    repo_data = common._nexus_get_repo_data(services, "cachito-pip-proxy")
+    _create_python_requirements_file(requirements_out, repo_data)
 
 
 @click.command()
@@ -255,6 +275,53 @@ def cmd_get_dependencies(clone_path, file, build_context):
     file_abs = os.path.abspath(file)
 
     _create_python_requirements_file(file_abs, repo_data)
+
+
+# cmd_pip_generate
+# Params: requirements_file_in, requirements_file_out
+@click.command()
+@click.option(
+    "--requirements-file-in",
+    "-i",
+    default="./requirements.txt",
+    help="Path to the requirements file to be processed",
+)
+@click.option(
+    "--requirements-file-out",
+    "-o",
+    default="./requirements-cachito.txt",
+    help="Path to the requirements file to be generated",
+)
+def cmd_pip_generate(requirements_file_in, requirements_file_out):
+    """Reads a requirements.txt file and generates a requirements-cachito.txt file
+    with all the indirect dependencies of the requirements.txt file.
+    """
+    import cli_server
+
+    # Check if server is running, start OR restart if needed
+    cli_server._check_dependencies()
+
+    requirements_file_in_abs = os.path.abspath(requirements_file_in)
+    requirements_file_out_abs = os.path.abspath(requirements_file_out)
+
+    if not os.path.isfile(requirements_file_in_abs):
+        logger.error("requirements_file_in not found: " + requirements_file_in_abs)
+        exit(1)
+
+    # TODO create new proxies instead of using the "cachito-pip-proxy"
+    repo_data = common._nexus_get_repo_data({}, "cachito-pip-proxy")
+
+    dependencies_list = []
+    for dependency in repo_data["dependencies"]:
+        if dependency["format"] == "pypi":
+            dependencies_list.append(f"{dependency['name']}=={dependency['version']}")
+    dependencies_list.sort()
+
+    out = ""
+    for dependency in dependencies_list:
+        out += f"{dependency}\n"
+    with open(requirements_file_out_abs, "w") as f:
+        f.write(out)
 
 
 # Click

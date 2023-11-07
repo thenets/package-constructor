@@ -78,9 +78,14 @@ def cmd_log(cmd: list, cwd: str = None) -> None:
 def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
     """Run a command"""
     cmd_log(cmd, cwd=cwd)
-    out = subprocess.run(
-        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
-    )
+    try:
+        out = subprocess.run(
+            cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"CMD: {e.cmd}")
+        logger.error(e.stderr.decode("utf-8"))
+        exit(1)
     return out
 
 
@@ -100,7 +105,7 @@ def check_executable(cmd: str) -> bool:
         return False
 
 
-def get_services(repo_path: str):
+def get_services(cachito_repo_path: str):
     """Get the services from the docker-compose.yml file"""
     services = {
         "athens": {},
@@ -109,7 +114,7 @@ def get_services(repo_path: str):
     }
 
     # Get data from podman
-    podman_project_name = os.path.basename(repo_path)
+    podman_project_name = os.path.basename(cachito_repo_path)
     cmd_out = run(
         [
             "podman",
@@ -120,7 +125,7 @@ def get_services(repo_path: str):
             "--filter",
             f"label=io.podman.compose.project={podman_project_name}",
         ],
-        cwd=repo_path,
+        cwd=cachito_repo_path,
     )
 
     # Try to retrieve endpoints data
@@ -234,3 +239,48 @@ def get_services(repo_path: str):
         exit(1)
 
     return services
+
+
+def get_cache_dir():
+    default_cache_dir = "./cache"
+    return os.path.abspath(default_cache_dir)
+
+
+def get_default_cachito_repo_path():
+    default_cachito_repo_path = "./cache/cachito_repo"
+    return os.path.abspath(default_cachito_repo_path)
+
+
+def is_running(cachito_repo_path: str) -> bool:
+    """Check if the services are running"""
+    services = get_services(cachito_repo_path)
+    logger.debug("is_running: Checking services")
+    for service_name, service in services.items():
+        logger.debug(f"Checking {service_name}")
+        if not service:
+            logger.warning(f"{service_name} is not running")
+            return False
+    return True
+
+
+def cachito_repo_exists(cachito_repo_path: str):
+    """Check if the Cachito repository already exists
+
+    Returns:
+        bool: True if the Cachito repository already exists
+              False if the Cachito repository does not exist but the path is valid
+    """
+    if not os.path.isdir(os.path.dirname(cachito_repo_path)):
+        logger.error(
+            "Parent directory does not exist: " + os.path.dirname(cachito_repo_path)
+        )
+        exit(1)
+    if os.path.isdir(cachito_repo_path):
+        if os.path.join(cachito_repo_path, ".git"):
+            logger.info("Git repository identified. Skipping clone")
+        else:
+            logger.error("Directory already exists and it is not a git repository")
+            exit(1)
+        return True
+    else:
+        return False
