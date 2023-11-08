@@ -4,15 +4,17 @@ import click
 
 import cli_builder
 import cli_server
-import helpers
+import common
 
-_global = helpers.get_global()
-logger = helpers.get_logger()
+_global = common.get_global()
+logger = common.get_logger()
+
+current_file_path = os.path.dirname(os.path.abspath(__file__)) + "/../"
 
 
 def _check_dependencies():
     # Check podman
-    if not helpers.check_executable("podman"):
+    if not common.check_executable("podman"):
         logger.error("podman is not available in the PATH")
         exit(1)
 
@@ -36,7 +38,7 @@ def _check_requirements_file_output(requirements_out) -> None:
 @click.option(
     "--clone-path",
     "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
+    default=current_file_path + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_status(clone_path):
@@ -45,13 +47,13 @@ def cmd_status(clone_path):
 
     # Basic checks
     _check_dependencies()
-    if not helpers.cachito_repo_exists(clone_path_abs):
+    if not common.cachito_repo_exists(clone_path_abs):
         logger.error("Cachito repository does not exist")
         exit(1)
 
     # Print status
     logger.info("Retrieving Cachito server containers list")
-    is_running = helpers.is_running(clone_path_abs)
+    is_running = common.is_running(clone_path_abs)
     if is_running:
         print("All services are operational")
     else:
@@ -62,7 +64,7 @@ def cmd_status(clone_path):
 @click.option(
     "--clone-path",
     "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
+    default=current_file_path + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(
@@ -88,14 +90,14 @@ def cmd_extract_dependencies(
 ):
     """From requirements-in.txt, extract the dependencies and write them to requirements-out.txt"""
     clone_path_abs = os.path.abspath(clone_path)
-    pip_cache_dir = os.path.join(helpers.get_cache_dir(), "pip-extract")
+    pip_cache_dir = os.path.join(common.get_cache_dir(), "pip-extract")
 
     # Basic checks
     if not os.path.isfile(requirements_in):
         logger.error("requirements-in.txt does not exist")
         exit(1)
     _check_dependencies()
-    if not helpers.cachito_repo_exists(clone_path_abs):
+    if not common.cachito_repo_exists(clone_path_abs):
         logger.error("Cachito repository does not exist")
         exit(1)
 
@@ -103,7 +105,7 @@ def cmd_extract_dependencies(
     if restart_server:
         cli_server.restart(clone_path_abs)
     else:
-        if not helpers.is_running(clone_path_abs):
+        if not common.is_running(clone_path_abs):
             cli_server.start(clone_path_abs)
 
     # Create a Containerfile with the cachito proxy
@@ -121,6 +123,33 @@ RUN set -x \
     && echo "nameserver 8.8.8.8" > /etc/resolv.conf
 #<cachito-disable> END
 
+RUN set -x \
+    && microdnf install -y \
+        # utils
+        tar \
+        vi \
+        findutils \
+        dnf \
+        # rust
+        cargo \
+        # gcc
+        gcc gcc-c++ cmake cmake-data \
+        # python
+        python3-cryptography \
+        python3-devel \
+        python3-pip-wheel \
+        python3-setuptools \
+        python3-setuptools-wheel \
+        python3-wheel-wheel \
+        python3-six \
+        # cryptography
+        libffi-devel \
+        openssl-devel \
+        redhat-rpm-config \
+        pkg-config \
+        # other build stuff
+        libpq-devel unixODBC
+
 #<cachito-proxy> BEGIN
 #RUN set -x \
 #    && rm -f /etc/resolv.conf
@@ -132,7 +161,7 @@ ENV PIP_INDEX=http://cachito:cachito@host.containers.internal:8082/repository/ca
 ENV PIP_INDEX_URL=http://cachito:cachito@host.containers.internal:8082/repository/cachito-pip-proxy/simple
 #<cachito-proxy> END
 
-# RUN pip install -U pip setuptools
+RUN pip install -U pip setuptools six
 
 RUN set -x \
     && mkdir -p /build \
@@ -144,7 +173,7 @@ RUN set -x \
     requirements_in_abs = os.path.abspath(requirements_in)
     requirements_in_cache = os.path.join(pip_cache_dir, "requirements-in.txt")
     os.makedirs(pip_cache_dir, exist_ok=True)
-    helpers.run(["cp", requirements_in_abs, requirements_in_cache])
+    common.run(["cp", requirements_in_abs, requirements_in_cache])
 
     logger.info("Building the container (no dns)")
     cmd = [
@@ -157,7 +186,7 @@ RUN set -x \
         "none",
         pip_cache_dir,
     ]
-    helpers.cmd_log(
+    common.cmd_log(
         cmd,
         cwd=pip_cache_dir,
     )
@@ -172,7 +201,7 @@ RUN set -x \
 @click.option(
     "--clone-path",
     "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
+    default=current_file_path + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(
