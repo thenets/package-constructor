@@ -171,6 +171,17 @@ def cmd_stop(clone_path):
     stop(cachito_repo_path)
 
 
+def _print_status(cachito_repo_path):
+    # Print status
+    logger.info("Retrieving Cachito server containers list")
+    services = helpers.get_services(cachito_repo_path)
+    print("All services are operational")
+    print(f"  Athens  : {services['athens']['url_local']}")
+    print(f"  Nexus   : {services['nexus']['url_local']}")
+    print(f"  Cachito : {services['cachito']['url_local']}")
+    print("")
+
+
 @click.command()
 @click.option(
     "--clone-path",
@@ -188,14 +199,23 @@ def cmd_status(clone_path):
         logger.error("Cachito repository does not exist")
         exit(1)
 
-    # Print status
-    logger.info("Retrieving Cachito server containers list")
-    services = helpers.get_services(cachito_repo_path)
-    print("All services are operational")
-    print(f"  Athens  : {services['athens']['url_local']}")
-    print(f"  Nexus   : {services['nexus']['url_local']}")
-    print(f"  Cachito : {services['cachito']['url_local']}")
-    print("")
+    _print_status(cachito_repo_path)
+
+
+# cmd_restart
+@click.command()
+@click.option(
+    "--clone-path",
+    "-p",
+    default=os.getcwd() + "/cache/cachito_repo",
+    help="Path where the Cachito repository is located",
+)
+def cmd_restart(clone_path):
+    """Restart the Cachito server"""
+    cachito_repo_path = os.path.abspath(clone_path)
+
+    restart(cachito_repo_path)
+    _print_status(cachito_repo_path)
 
 
 # Click
@@ -206,4 +226,5 @@ def click_add_group(cli: click.Group) -> None:
     cmd_server.add_command(name="start", cmd=cmd_start)
     cmd_server.add_command(name="stop", cmd=cmd_stop)
     cmd_server.add_command(name="status", cmd=cmd_status)
+    cmd_server.add_command(name="restart", cmd=cmd_restart)
     cli.add_command(cmd_server)
