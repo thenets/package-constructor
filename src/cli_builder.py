@@ -4,10 +4,9 @@ import click
 import jinja2
 
 import common
-import helpers
 
-_global = helpers.get_global()
-logger = helpers.get_logger()
+_global = common.get_global()
+logger = common.get_logger()
 
 
 def _new_template_interceptor(container_file_path: str, services: dict) -> str:
@@ -160,7 +159,7 @@ def dump_dependencies_from_cachito_pip_proxy_to_file(
     requirements_out: str,
 ):
     """Dump the dependencies list from the Cachito pip proxy repo to a file"""
-    services = helpers.get_services(cachito_repo_path)
+    services = common.get_services(cachito_repo_path)
     repo_data = common._nexus_get_repo_data(services, "cachito-pip-proxy")
     _create_python_requirements_file(requirements_out, repo_data)
 
@@ -169,7 +168,7 @@ def dump_dependencies_from_cachito_pip_proxy_to_file(
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(
@@ -198,7 +197,7 @@ def cmd_build(clone_path, file, build_context, tag, no_cache):
     if no_cache:
         additional_args.append("--no-cache")
 
-    services = helpers.get_services(clone_path)
+    services = common.get_services(clone_path)
     networks = [service["network"] for service in services.values()]
     if len(set(networks)) != 1:
         logger.error("All services must use the same network")
@@ -229,7 +228,7 @@ def cmd_build(clone_path, file, build_context, tag, no_cache):
                 build_context_abs,
             ]
         )
-        helpers.cmd_log(command)
+        common.cmd_log(command)
         rc = os.system(" ".join(command))
         if rc != 0:
             raise Exception(f"Return code: {rc}")
@@ -251,7 +250,7 @@ def cmd_build(clone_path, file, build_context, tag, no_cache):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 @click.option(
@@ -269,7 +268,7 @@ def cmd_get_dependencies(clone_path, file, build_context):
     """Get the dependencies files for a container build"""
     _build_validate(file, build_context)
 
-    services = helpers.get_services(clone_path)
+    services = common.get_services(clone_path)
     # TODO create new proxies instead of using the "cachito-pip-proxy"
     repo_data = common._nexus_get_repo_data(services, "cachito-pip-proxy")
     file_abs = os.path.abspath(file)

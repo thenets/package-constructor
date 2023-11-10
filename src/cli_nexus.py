@@ -1,24 +1,24 @@
+import os
+
 import click
 import requests
 
 import common
-import helpers
+
 
 # Sonatype Nexus
 # --------------------
-
-
 @click.command()
 @click.option("--json", default=False, is_flag=True, help="Print JSON")
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_nexus_list_repos(clone_path, json):
     """List Nexus repositories"""
-    services = helpers.get_services(clone_path)
+    services = common.get_services(clone_path)
     nexus_url = services["nexus"]["url_local"]
 
     r = requests.get(
@@ -27,7 +27,7 @@ def cmd_nexus_list_repos(clone_path, json):
     )
     if r.status_code == 200:
         if json:
-            helpers.print_json(r.json())
+            common.print_json(r.json())
         else:
             print("Repositories:")
             for item in r.json():
@@ -42,12 +42,12 @@ def cmd_nexus_list_repos(clone_path, json):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_nexus_list_components(clone_path, repo_name, json):
     """List components in a Nexus repository"""
-    services = helpers.get_services(clone_path)
+    services = common.get_services(clone_path)
     nexus_url = services["nexus"]["url_local"]
 
     def _pag_request(cont_token=None):
@@ -80,7 +80,7 @@ def cmd_nexus_list_components(clone_path, repo_name, json):
             break
 
     if json:
-        helpers.print_json(full_items)
+        common.print_json(full_items)
     else:
         print("Components:")
         components = full_items
@@ -96,12 +96,12 @@ def cmd_nexus_list_components(clone_path, repo_name, json):
 @click.option(
     "--clone-path",
     "-p",
-    default="./cache/cachito_repo",
+    default=os.getcwd() + "/cache/cachito_repo",
     help="Path where the Cachito repository is located",
 )
 def cmd_nexus_describe_repo(clone_path, repo_name, json):
     """List packages in a Nexus repository"""
-    services = helpers.get_services(clone_path)
+    services = common.get_services(clone_path)
     nexus_url = services["nexus"]["url_local"]
 
     r = requests.get(
@@ -110,7 +110,7 @@ def cmd_nexus_describe_repo(clone_path, repo_name, json):
     )
     if r.status_code == 200:
         if json:
-            helpers.print_json(r.json())
+            common.print_json(r.json())
         else:
             print(f"Repository: {repo_name}")
             item = r.json()

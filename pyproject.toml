@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "package-constructor"
+version = "0.0.1"
+description = "All you need to build packages and applications in an air-gapped environment."
+authors = ["Luiz Costa <luiz@thenets.org>"]
+license = "GPL-2.0"
+readme = "README.md"
+
+# Dependencies
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.31.0"
+click = "^8.1.7"
+openapi-python-client = "^0.15.2"
+PyYAML = "^6.0.1"
+Jinja2 = "^3.1.2"
+
+[tool.poetry.group.test]
+optional = true
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.3"
+
+[tool.poetry.group.dev]
+optional = true
+[tool.poetry.group.dev.dependencies]
+black = "*"
+ruff = "*"
+isort = "*"
+
+# Build
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# Test
+[tool.pytest.ini_options]
+testpaths = ["./src", "./tests"]
+norecursedirs = ["./venv/", "./cache/", "./.ruff_cache/", "./build/"]
+python_files = "*.py"
+python_functions = "test_* cli_*"
+python_classes = "Test*"
+addopts = [
+    # increase verbosity
+    "--verbose",
+    # same as -s. per-test capturing method: one of fd|sys|no|tee-sys.
+    "--capture=no",
+    # fail if there are markers not registered in this file
+    # "--strict-markers",
+    ]
+# markers = ["get", "post"]

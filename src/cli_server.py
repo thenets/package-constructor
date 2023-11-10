@@ -2,25 +2,28 @@ import os
 import time
 
 import click
+import pytest
 import yaml
 
-import helpers
+import common
 
-_global = helpers.get_global()
-logger = helpers.get_logger()
+_global = common.get_global()
+logger = common.get_logger()
+
+_cachito_repo_path = common.get_cachito_repository_path()
 
 
 def _check_dependencies():
     # Check podman
-    if not helpers.check_executable("podman"):
+    if not common.check_executable("podman"):
         logger.error("podman is not available in the PATH")
         exit(1)
     # Check podman-compose
-    if not helpers.check_executable("podman-compose"):
+    if not common.check_executable("podman-compose"):
         logger.error("podman-compose is not available in the PATH")
         exit(1)
     # Check git
-    if not helpers.check_executable("git"):
+    if not common.check_executable("git"):
         logger.error("git is not available in the PATH")
         exit(1)
 
@@ -37,6 +40,8 @@ def _get_compose_file_data(cachito_repo_path: str):
     return compose_data
 
 
+# Shared functions
+# ====================
 def start(cachito_repo_path: str):
     """Start the Cachito server if is not running
 
@@ -45,17 +50,17 @@ def start(cachito_repo_path: str):
     """
     # Basic checks
     _check_dependencies()
-    if not helpers.cachito_repo_exists(cachito_repo_path):
+    if not common.cachito_repo_exists(cachito_repo_path):
         # Clone cachito
         logger.info("Cloning Cachito repository")
-        helpers.run(["git", "clone", _global["cachito_git_url"], cachito_repo_path])
+        common.run(["git", "clone", _global["cachito_git_url"], cachito_repo_path])
 
     logger.info("Fixing volume permissions")
     compose = _get_compose_file_data(cachito_repo_path)
 
     # Fix nexus permissions
     nexus_uid = (
-        helpers.run(
+        common.run(
             [
                 "podman",
                 "run",
@@ -71,7 +76,7 @@ def start(cachito_repo_path: str):
         .strip()
     )
     nexus_gid = (
-        helpers.run(
+        common.run(
             [
                 "podman",
                 "run",
@@ -91,17 +96,17 @@ def start(cachito_repo_path: str):
         cachito_repo_path, compose["services"]["nexus"]["volumes"][0].split(":")[0]
     )
     os.makedirs(volume_path, exist_ok=True)
-    helpers.run(
+    common.run(
         ["podman", "unshare", "chown", "-R", f"{nexus_uid}:{nexus_gid}", volume_path]
     )
 
     # Start the services
-    helpers.run(["podman-compose", "up", "-d"], cwd=cachito_repo_path)
+    common.run(["podman-compose", "up", "-d"], cwd=cachito_repo_path)
     logger.info("Waiting for services to be operational. Sleeping for 30 seconds")
     time.sleep(30)
 
     # Get services data
-    services = helpers.get_services(cachito_repo_path)
+    services = common.get_services(cachito_repo_path)
     logger.info("Services are operational")
     return services
 
@@ -109,12 +114,12 @@ def start(cachito_repo_path: str):
 def stop(cachito_repo_path: str):
     # Basic checks
     _check_dependencies()
-    if not helpers.cachito_repo_exists(cachito_repo_path):
+    if not common.cachito_repo_exists(cachito_repo_path):
         logger.error("Cachito repository does not exist")
         exit(1)
 
     logger.info("Stopping Cachito server")
-    helpers.run(
+    common.run(
         ["podman-compose", "down", "-v", "--remove-orphans"], cwd=cachito_repo_path
     )
     logger.info("Removing volumes")
@@ -122,12 +127,12 @@ def stop(cachito_repo_path: str):
     volume_path = os.path.join(
         cachito_repo_path, compose["services"]["nexus"]["volumes"][0].split(":")[0]
     )
-    helpers.run(["podman", "unshare", "rm", "-rf", volume_path])
+    common.run(["podman", "unshare", "rm", "-rf", volume_path])
 
 
 def restart(cachito_repo_path: str):
     """Restart the Cachito server if is running or start it if is not running"""
-    if helpers.is_running(cachito_repo_path):
+    if common.is_running(cachito_repo_path):
         logger.info("Restarting Cachito server")
         stop(cachito_repo_path)
         start(cachito_repo_path)
@@ -136,66 +141,55 @@ def restart(cachito_repo_path: str):
         start(cachito_repo_path)
 
 
+# Click commands
+# ====================
+def _print_status(cachito_repo_path, services=None):
+    logger.info("Retrieving Cachito server containers list")
+    if services is None:
+        services = common.get_services(cachito_repo_path)
+    click.echo("All services are operational")
+    click.echo(f"  Athens  : {services['athens']['url_local']}")
+    click.echo(f"  Nexus   : {services['nexus']['url_local']}")
+    click.echo(f"  Cachito : {services['cachito']['url_local']}")
+    click.echo("")
+
+
 @click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default="./cache/cachito_repo",
-    help="Path to clone the Cachito repository",
-)
-def cmd_start(clone_path):
+def cmd_start():
     """start a new Cachito server with all the related services."""
-    cachito_repo_path = os.path.abspath(clone_path)
-
-    services = start(cachito_repo_path)
-
-    # Print status
-    print("All services are operational")
-    print(f"  Athens  : {services['athens']['url_local']}")
-    print(f"  Nexus   : {services['nexus']['url_local']}")
-    print(f"  Cachito : {services['cachito']['url_local']}")
-    print("")
+    if common.is_running(_cachito_repo_path):
+        click.echo("Cachito server is already running")
+        services = common.get_services(_cachito_repo_path)
+        _print_status(_cachito_repo_path, services)
+        exit(0)
+    services = start(_cachito_repo_path)
+    _print_status(_cachito_repo_path, services)
 
 
 @click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default="./cache/cachito_repo",
-    help="Path where the Cachito repository is located",
-)
-def cmd_stop(clone_path):
+def cmd_stop():
     """Stop the Cachito server"""
-    cachito_repo_path = os.path.abspath(clone_path)
-
-    stop(cachito_repo_path)
+    stop(_cachito_repo_path)
+    click.echo("Cachito server stopped")
 
 
 @click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default="./cache/cachito_repo",
-    help="Path where the Cachito repository is located",
-)
-def cmd_status(clone_path):
+def cmd_status():
     """Show the status of the Cachito server"""
-    cachito_repo_path = os.path.abspath(clone_path)
-
     # Basic checks
     _check_dependencies()
-    if not helpers.cachito_repo_exists(cachito_repo_path):
+    if not common.cachito_repo_exists(_cachito_repo_path):
         logger.error("Cachito repository does not exist")
         exit(1)
 
-    # Print status
-    logger.info("Retrieving Cachito server containers list")
-    services = helpers.get_services(cachito_repo_path)
-    print("All services are operational")
-    print(f"  Athens  : {services['athens']['url_local']}")
-    print(f"  Nexus   : {services['nexus']['url_local']}")
-    print(f"  Cachito : {services['cachito']['url_local']}")
-    print("")
+    _print_status(_cachito_repo_path)
+
+
+@click.command()
+def cmd_restart():
+    """Restart the Cachito server"""
+    restart(_cachito_repo_path)
+    _print_status(_cachito_repo_path)
 
 
 # Click
@@ -206,4 +200,20 @@ def click_add_group(cli: click.Group) -> None:
     cmd_server.add_command(name="start", cmd=cmd_start)
     cmd_server.add_command(name="stop", cmd=cmd_stop)
     cmd_server.add_command(name="status", cmd=cmd_status)
+    cmd_server.add_command(name="restart", cmd=cmd_restart)
     cli.add_command(cmd_server)
+
+
+@pytest.mark.usefixtures("server")
+class TestServer:
+    def test_status(self, runner):
+        # change cwd to something else
+        result = runner.invoke(cmd_status, [])
+        assert result.exit_code == 0
+        assert "All services are operational" in result.output
+
+    def test_start_twice(self, runner):
+        result = runner.invoke(cmd_start, [])
+        assert result.exit_code == 0
+        assert "Cachito server is already running" in result.output
+        assert "All services are operational" in result.output
