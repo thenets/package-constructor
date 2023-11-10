@@ -20,7 +20,8 @@ lint: venv
 .PHONY: test
 test:
 	@echo "You can pass custom args: make test ARGS='-k test_something'"
-	./venv/bin/pytest $(ARGS)
+	@echo
+	./venv/bin/pytest -c ./pyproject.toml $(ARGS)
 
 .PHONY: update-freeze
 update-freeze: clean venv

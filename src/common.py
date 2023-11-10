@@ -349,3 +349,11 @@ def cachito_repo_exists(cachito_repo_path: str):
         return True
     else:
         return False
+
+
+def get_cachito_repository_path() -> str:
+    """Returns the path where the Cachito repository is located"""
+    current_python_file_path = os.path.abspath(__file__)
+    return os.path.join(
+        os.path.dirname(current_python_file_path), "./../cache/cachito_repo"
+    )

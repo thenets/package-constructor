@@ -2,12 +2,15 @@ import os
 import time
 
 import click
+import pytest
 import yaml
 
 import common
 
 _global = common.get_global()
 logger = common.get_logger()
+
+_cachito_repo_path = common.get_cachito_repository_path()
 
 
 def _check_dependencies():
@@ -37,6 +40,8 @@ def _get_compose_file_data(cachito_repo_path: str):
     return compose_data
 
 
+# Shared functions
+# ====================
 def start(cachito_repo_path: str):
     """Start the Cachito server if is not running
 
@@ -136,86 +141,50 @@ def restart(cachito_repo_path: str):
         start(cachito_repo_path)
 
 
-@click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
-    help="Path to clone the Cachito repository",
-)
-def cmd_start(clone_path):
-    """start a new Cachito server with all the related services."""
-    cachito_repo_path = os.path.abspath(clone_path)
-
-    services = start(cachito_repo_path)
-
-    # Print status
-    print("All services are operational")
-    print(f"  Athens  : {services['athens']['url_local']}")
-    print(f"  Nexus   : {services['nexus']['url_local']}")
-    print(f"  Cachito : {services['cachito']['url_local']}")
-    print("")
-
-
-@click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
-    help="Path where the Cachito repository is located",
-)
-def cmd_stop(clone_path):
-    """Stop the Cachito server"""
-    cachito_repo_path = os.path.abspath(clone_path)
-
-    stop(cachito_repo_path)
-
-
-def _print_status(cachito_repo_path):
-    # Print status
+# Click commands
+# ====================
+def _print_status(cachito_repo_path, services=None):
     logger.info("Retrieving Cachito server containers list")
-    services = common.get_services(cachito_repo_path)
-    print("All services are operational")
-    print(f"  Athens  : {services['athens']['url_local']}")
-    print(f"  Nexus   : {services['nexus']['url_local']}")
-    print(f"  Cachito : {services['cachito']['url_local']}")
-    print("")
+    if services is None:
+        services = common.get_services(cachito_repo_path)
+    click.echo("All services are operational")
+    click.echo(f"  Athens  : {services['athens']['url_local']}")
+    click.echo(f"  Nexus   : {services['nexus']['url_local']}")
+    click.echo(f"  Cachito : {services['cachito']['url_local']}")
+    click.echo("")
 
 
 @click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
-    help="Path where the Cachito repository is located",
-)
-def cmd_status(clone_path):
-    """Show the status of the Cachito server"""
-    cachito_repo_path = os.path.abspath(clone_path)
+def cmd_start():
+    """start a new Cachito server with all the related services."""
+    services = start(_cachito_repo_path)
+    _print_status(_cachito_repo_path, services)
 
+
+@click.command()
+def cmd_stop():
+    """Stop the Cachito server"""
+    stop(_cachito_repo_path)
+    click.echo("Cachito server stopped")
+
+
+@click.command()
+def cmd_status():
+    """Show the status of the Cachito server"""
     # Basic checks
     _check_dependencies()
-    if not common.cachito_repo_exists(cachito_repo_path):
+    if not common.cachito_repo_exists(_cachito_repo_path):
         logger.error("Cachito repository does not exist")
         exit(1)
 
-    _print_status(cachito_repo_path)
+    _print_status(_cachito_repo_path)
 
 
-# cmd_restart
 @click.command()
-@click.option(
-    "--clone-path",
-    "-p",
-    default=os.getcwd() + "/cache/cachito_repo",
-    help="Path where the Cachito repository is located",
-)
-def cmd_restart(clone_path):
+def cmd_restart():
     """Restart the Cachito server"""
-    cachito_repo_path = os.path.abspath(clone_path)
-
-    restart(cachito_repo_path)
-    _print_status(cachito_repo_path)
+    restart(_cachito_repo_path)
+    _print_status(_cachito_repo_path)
 
 
 # Click
@@ -228,3 +197,11 @@ def click_add_group(cli: click.Group) -> None:
     cmd_server.add_command(name="status", cmd=cmd_status)
     cmd_server.add_command(name="restart", cmd=cmd_restart)
     cli.add_command(cmd_server)
+
+
+@pytest.mark.usefixtures("server")
+class TestServer:
+    def test_status(self, runner):
+        result = runner.invoke(cmd_status, [])
+        assert result.exit_code == 0
+        assert "All services are operational" in result.output
