@@ -157,6 +157,11 @@ def _print_status(cachito_repo_path, services=None):
 @click.command()
 def cmd_start():
     """start a new Cachito server with all the related services."""
+    if common.is_running(_cachito_repo_path):
+        click.echo("Cachito server is already running")
+        services = common.get_services(_cachito_repo_path)
+        _print_status(_cachito_repo_path, services)
+        exit(0)
     services = start(_cachito_repo_path)
     _print_status(_cachito_repo_path, services)
 
@@ -202,6 +207,13 @@ def click_add_group(cli: click.Group) -> None:
 @pytest.mark.usefixtures("server")
 class TestServer:
     def test_status(self, runner):
+        # change cwd to something else
         result = runner.invoke(cmd_status, [])
         assert result.exit_code == 0
+        assert "All services are operational" in result.output
+
+    def test_start_twice(self, runner):
+        result = runner.invoke(cmd_start, [])
+        assert result.exit_code == 0
+        assert "Cachito server is already running" in result.output
         assert "All services are operational" in result.output
