@@ -19,6 +19,42 @@ requests_s.verify = False
 requests.packages.urllib3.disable_warnings()
 
 
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+
+    # Based on https://stackoverflow.com/questions/2352181/how-to-use-a-dot-to-access-members-of-dictionary
+    def __init__(self, *args, **kwargs):
+        # recursively convert nested dicts
+        for arg in args:
+            if isinstance(arg, dict):
+                for k, v in arg.items():
+                    if isinstance(v, dict):
+                        v = dotdict(v)
+                    self[k] = v
+        if kwargs:
+            for k, v in kwargs.items():
+                if isinstance(v, dict):
+                    v = dotdict(v)
+                self[k] = v
+
+    def __getattr__(self, attr):
+        return self.get(attr)
+
+    def __setattr__(self, key, value):
+        self.__setitem__(key, value)
+
+    def __setitem__(self, key, value):
+        super(dotdict, self).__setitem__(key, value)
+        self.__dict__.update({key: value})
+
+    def __delattr__(self, item):
+        self.__delitem__(item)
+
+    def __delitem__(self, key):
+        super(dotdict, self).__delitem__(key)
+        del self.__dict__[key]
+
+
 def _setup_logger():
     class ColoredFormatter(logging.Formatter):
         # Based on https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output

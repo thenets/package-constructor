@@ -42,7 +42,7 @@ container:
     content: |
       FROM docker.io/redhat/ubi9:latest
       RUN set x \
-          && microdnf install -y \
+          && dnf install -y \
               # utils
               tar vim bash findutils dnf \
               # rust

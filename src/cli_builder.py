@@ -325,9 +325,17 @@ def cmd_pip_generate(requirements_file_in, requirements_file_out):
         f.write(out)
 
 
-class BuilderConfig():
+class Builder():
+    config = None
+
     def __init__(self, config_file_path: str):
-        # Load the config file and validate it
+        self._load_config(config_file_path)
+
+        # Create the workdir
+        os.makedirs(self.config.workdir.path, exist_ok=True)
+
+    def _load_config(self, config_file_path: str):
+        """Load the config file and validate it"""
         self.config_file_path = config_file_path
         if not os.path.isfile(config_file_path):
             logger.error("Config file not found: " + config_file_path)
@@ -335,23 +343,21 @@ class BuilderConfig():
         with open(config_file_path, "r") as f:
             config_file_content = f.read()
             import yaml
-            config = yaml.safe_load(config_file_content)
-        if not self._is_config_file_valid(config):
+            config_data = yaml.safe_load(config_file_content)
+        if not self._is_config_file_valid(config_data):
             logger.error("Config file is not valid: " + config_file_path)
             exit(1)
-        import box
-        self.data = box.Box(config)
+        self.config = common.dotdict(config_data)
 
-        # Create the workdir path
-        if self.data.workdir.path.startswith("/"):
-            self.workdir = self.data.workdir.path
+        # Workdir must be an absolute path
+        if self.config.workdir.path.startswith("/"):
+            self.config.workdir.path = self.config.workdir.path.path
         else:
-            self.workdir = os.path.join(
+            _tmp_path = os.path.join(
                 os.path.dirname(self.config_file_path),
-                self.data.workdir.path,
+                self.config.workdir.path,
             )
-            self.workdir = os.path.abspath(self.workdir)
-        os.makedirs(self.workdir, exist_ok=True)
+            self.config.workdir.path = os.path.abspath(_tmp_path)
 
     def _is_config_file_valid(self, config: dict):
         """Validate the config file"""
@@ -418,25 +424,46 @@ class BuilderConfig():
             logger.error(e)
             return False
 
+    def _pull_sources(self):
+        pass
 
+    def _build_base_image(self):
+        """Build the base image"""
+        # Pull the base image if content is not present
+        if not self.config.container.baseImage.content:
+            logger.info("Pulling base image: " + self.config["container"]["baseImage"]["name"])
+            common.check_output(
+                [
+                    "podman",
+                    "pull",
+                    self.config["container"]["baseImage"]["name"],
+                ]
+            )
+            return
 
-def _build_base_image(config):
-    """Build the base image"""
-    # Pull the base image if content is not present
-    if not config["container"]["baseImage"]["content"]:
-        logger.info("Pulling base image: " + config["container"]["baseImage"]["name"])
+        # Create the Containerfile
+        containerfile_path = os.path.join(self.config.workdir.path, "base_image.containerfile")
+        logger.info("Creating Containerfile: " + containerfile_path)
+        with open(containerfile_path, "w") as f:
+            f.write(self.config.container.baseImage.content)
+
+        # Build the base image
+        logger.info("Building base image")
         common.check_output(
             [
                 "podman",
-                "pull",
-                config["container"]["baseImage"]["name"],
+                "build",
+                "-f",
+                containerfile_path,
+                "-t",
+                self.config.container.containerImageName,
+                self.config.workdir.path,
             ]
         )
-        return
 
-    # Create the Containerfile
-    containerfile_path = os.path.join(config["workdir"], "base_image.containerfile")
-    logger.info("Creating Containerfile: " + containerfile_path)
+    def build(self):
+        self._pull_sources()
+        self._build_base_image()
 
 
 
@@ -449,8 +476,11 @@ def _build_base_image(config):
 )
 def cmd_run(config_file):
     """creates a build from a constructor config file"""
-    config = BuilderConfig(config_file)
-    logger.info("Workdir: " + config.workdir)
+    builder = Builder(config_file)
+    logger.info("Workdir: " + builder.config.workdir.path)
+    builder.build()
+
+
 
 
 
