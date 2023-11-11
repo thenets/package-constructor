@@ -196,7 +196,7 @@ def cmd_restart():
 # ====================
 def click_add_group(cli: click.Group) -> None:
     """Add the group to the CLI"""
-    cmd_server = click.Group("server", help="Cachito server commands")
+    cmd_server = click.Group("server", help="Proxy and tool servers")
     cmd_server.add_command(name="start", cmd=cmd_start)
     cmd_server.add_command(name="stop", cmd=cmd_stop)
     cmd_server.add_command(name="status", cmd=cmd_status)

@@ -3,6 +3,7 @@ venv/
 .env
 cache/
 requirements-freeze.txt
+.ruff_cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -88,9 +88,7 @@ ENV {{ k }}={{ v }}
 #<cachito-proxy> END
 {{ container_file_content_after_proxy }}
 """
-    template_env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader("."), autoescape=True
-    )
+    template_env = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
     template = template_env.from_string(template_string)
     template_result = template.render(template_data)
 
@@ -325,139 +323,11 @@ def cmd_pip_generate(requirements_file_in, requirements_file_out):
         f.write(out)
 
 
-class BuilderConfig():
-    def __init__(self, config_file_path: str):
-        # Load the config file and validate it
-        self.config_file_path = config_file_path
-        if not os.path.isfile(config_file_path):
-            logger.error("Config file not found: " + config_file_path)
-            exit(1)
-        with open(config_file_path, "r") as f:
-            config_file_content = f.read()
-            import yaml
-            config = yaml.safe_load(config_file_content)
-        if not self._is_config_file_valid(config):
-            logger.error("Config file is not valid: " + config_file_path)
-            exit(1)
-        import box
-        self.data = box.Box(config)
-
-        # Create the workdir path
-        if self.data.workdir.path.startswith("/"):
-            self.workdir = self.data.workdir.path
-        else:
-            self.workdir = os.path.join(
-                os.path.dirname(self.config_file_path),
-                self.data.workdir.path,
-            )
-            self.workdir = os.path.abspath(self.workdir)
-        os.makedirs(self.workdir, exist_ok=True)
-
-    def _is_config_file_valid(self, config: dict):
-        """Validate the config file"""
-        from schema import And, Optional, Schema, SchemaError
-
-        def _is_url(s):
-            """Validates URL format"""
-            import re
-
-            match = "^https?:\/\/.*$"
-            return bool(re.match(match, s))
-
-        schema_template = Schema(
-            {
-                "kind": And(
-                    str,
-                    lambda s: s in ("container"),
-                    error="Invalid kind. Valid values: [container]",
-                ),
-                "workdir": {
-                    "path": And(str, len, error="Invalid path."),
-                },
-                "sources": [
-                    {
-                        "kind": And(
-                            str,
-                            lambda s: s in ("git"),
-                            error="Invalid kind. Valid values: [git]",
-                        ),
-                        "url": And(
-                            str,
-                            len,
-                            _is_url,
-                            error="Invalid URL. Valid example: https://github.com/thenets/rinted-container.git",
-                        ),
-                        "ref": And(str, len, error="Invalid ref."),
-                        "path": And(str, len, error="Invalid path."),
-                    }
-                ],
-                "container": {
-                    "containerImageName": And(str, len),
-                    "containerfilePath": And(str, len),
-                    "baseImage": {
-                        "name": And(str, len),
-                        Optional("content"): And(str, len),
-                    },
-                    "restrictions": {
-                        "disableDnsResolution": And(bool),
-                    },
-                    "proxies": {
-                        "python": And(bool),
-                        "golang": And(bool),
-                    },
-                    "sources_subpath": And(str, len),
-                    "podmanCacheEnabled": And(bool),
-                },
-            }
-        )
-
-        try:
-            schema_template.validate(config)
-            return True
-        except SchemaError as e:
-            logger.error(e)
-            return False
-
-
-
-def _build_base_image(config):
-    """Build the base image"""
-    # Pull the base image if content is not present
-    if not config["container"]["baseImage"]["content"]:
-        logger.info("Pulling base image: " + config["container"]["baseImage"]["name"])
-        common.check_output(
-            [
-                "podman",
-                "pull",
-                config["container"]["baseImage"]["name"],
-            ]
-        )
-        return
-
-    # Create the Containerfile
-    containerfile_path = os.path.join(config["workdir"], "base_image.containerfile")
-    logger.info("Creating Containerfile: " + containerfile_path)
-
-
-
-@click.command()
-@click.option(
-    "--config-file",
-    "-c",
-    default="./constructor.yml",
-    help="Path to the constructor config file",
-)
-def cmd_run(config_file):
-    """creates a build from a constructor config file"""
-    config = BuilderConfig(config_file)
-    logger.info("Workdir: " + config.workdir)
-
-
-
 # Click
 # ====================
 def click_add_group(cli: click.Group) -> None:
     """Add the group to the CLI"""
     cmd_server = click.Group("builder", help="Container builder commands")
-    cmd_server.add_command(name="run", cmd=cmd_run)
+    cmd_server.add_command(name="build", cmd=cmd_build)
+    cmd_server.add_command(name="get-dependencies", cmd=cmd_get_dependencies)
     cli.add_command(cmd_server)

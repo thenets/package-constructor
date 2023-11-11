@@ -14,6 +14,8 @@ click = "^8.1.7"
 openapi-python-client = "^0.15.2"
 PyYAML = "^6.0.1"
 Jinja2 = "^3.1.2"
+schema = "^0.7.5"
+python-box = "^7.1.1"
 
 [tool.poetry.group.test]
 optional = true

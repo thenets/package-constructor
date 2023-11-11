@@ -1,0 +1,84 @@
+# Simplest scenario for the Package Constructor build system
+# - Container build
+
+---
+
+# Defines the container build
+kind: container
+
+# Defines the working directory where the constructor will be executed
+# and will store all the generated files
+workdir:
+  # Path to the working directory relative to the configuration file
+  path: ./cache/
+
+# Each source will be cloned into a volume
+# and then added to the container build
+sources:
+  - kind: git
+    url: https://github.com/pyca/cryptography.git
+    ref: "41.0.5"
+    path: cryptography
+
+# Assuming "kind: container", the container key is required
+container:
+  # Output image name (required)
+  containerImageName: "package-constructor-scenario-simple"
+
+  # Main Containerfile (required)
+  # This is where the main logic of the container build is defined
+  containerfilePath: ./
+
+  # Base image with no restrictions
+  # (for example, you can download any package from the internet)
+  baseImage:
+    # OR image name
+    # The base image to use for the container build
+    # must be consumed by the containerfile defined in the `containerfilePath`
+    name: my-base-image
+
+    # BUT if you define a base_containerfile, the base_image is ignored
+    # and the base_containerfile is used instead
+    content: |
+      FROM docker.io/redhat/ubi9:latest
+      RUN set x \
+          && microdnf install -y \
+              # utils
+              tar vim bash findutils dnf \
+              # rust
+              cargo \
+              # gcc
+              gcc gcc-c++ cmake cmake-data \
+              # cryptography
+              libffi-devel openssl-devel redhat-rpm-config pkg-config \
+              # python
+              python3-devel \
+              python3-pip-wheel \
+              python3-setuptools \
+              python3-setuptools-wheel \
+              python3-wheel-wheel \
+              python3-six
+
+  # All restrictions applied during the build time
+  # if a build can be performed in a container with these restrictions
+  # it probably means that all the dependencies can be compiled in an
+  # air-gapped environment.
+  restrictions:
+    disableDnsResolution: false
+
+  # All proxies applied during the build time
+  # in order to enable them, you must source the proxy file
+  # example:
+  #   COPY constructor/proxy.sh /tmp/proxy.sh
+  #   RUN source /tmp/proxy.sh && pip install requests
+  proxies:
+    python: true
+    golang: true
+
+  # Sources subpath (default: sources)
+  # Available in the container build context
+  # Example: COPY sources /tmp/sources
+  sources_subpath: sources
+
+  # Cache enabled (default: true)
+  podmanCacheEnabled: false
