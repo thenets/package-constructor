@@ -88,7 +88,9 @@ ENV {{ k }}={{ v }}
 #<cachito-proxy> END
 {{ container_file_content_after_proxy }}
 """
-    template_env = jinja2.Environment(loader=jinja2.FileSystemLoader("."))
+    template_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader("."), autoescape=True
+    )
     template = template_env.from_string(template_string)
     template_result = template.render(template_data)
 

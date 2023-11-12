@@ -4,13 +4,15 @@ from click.testing import CliRunner
 import cli_server
 import common
 
+
 def pytest_addoption(parser):
     parser.addoption(
-        '--server-keep-running',
-        help='Do not restart or stop the Cachito server',
-        action='store_true',
+        "--server-keep-running",
+        help="Do not restart or stop the Cachito server",
+        action="store_true",
         default=False,
     )
+
 
 @pytest.fixture(scope="session", autouse=True)
 def disable_logging():
