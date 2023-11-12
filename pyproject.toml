@@ -32,6 +32,13 @@ isort = "*"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+# Audit
+[tool.poetry.group.audit]
+optional = true
+[tool.poetry.group.audit.dependencies]
+bandit = "*"
+pip-audit = "^2.6.1"
+
 # Test
 [tool.pytest.ini_options]
 testpaths = ["./src", "./tests"]

@@ -1,13 +1,20 @@
+# =============
+# Utils
+# =============
 venv:
 	python3 -m venv venv
 	venv/bin/pip install -U pip poetry
 	export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
-		&& venv/bin/poetry install --no-root --with dev --with test
+		&& venv/bin/poetry install --no-root \
+			--with dev \
+			--with test \
+			--with audit
 	venv/bin/poetry show --tree
 
 .PHONY: clean
 clean:
 	rm -rf venv/
+	rm -f requirements-freeze.txt
 
 .PHONY: fmt
 fmt: venv
@@ -16,10 +23,22 @@ fmt: venv
 	./venv/bin/ruff --fix ./src/
 
 .PHONY: lint
-
 lint: venv
 	@./venv/bin/ruff check ./src/
+	@./venv/bin/bandit \
+		-r ./src/ \
+		--severity high
 
+.PHONY: pre-commit
+pre-commit: fmt lint
+
+.PHONY: security-check
+security-check: update-freeze
+	./venv/bin/pip-audit -r requirements-freeze.txt
+
+# =============
+# Tests
+# =============
 .PHONY: test
 ## Run tests
 test:
@@ -34,12 +53,18 @@ test-dev:
 	@echo
 	./venv/bin/pytest -c ./pyproject.toml $(ARGS)
 
+# =============
+# Dependencies
+# =============
 .PHONY: update-freeze
 update-freeze: clean venv
-	./venv/bin/pip freeze > requirements-freeze.txt
-	make _audit --no-print-directory
-	make clean venv --no-print-directory
+# - Freeze only the virtualenv dependencies
+	./venv/bin/poetry export --without-hashes --format=requirements.txt > requirements-freeze.txt
 
-_audit:
-	./venv/bin/pip install -U pip-audit
-	./venv/bin/pip-audit -r requirements-freeze.txt
+.PHONY: poetry-update
+poetry-update:
+	@set -x \
+	&& export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+	&& venv/bin/poetry lock \
+	&& venv/bin/poetry update \
+	&& venv/bin/poetry show --tree
