@@ -294,6 +294,17 @@ files = [
 ]
 
 [[package]]
+name = "contextlib2"
+version = "21.6.0"
+description = "Backports and enhancements for the contextlib module"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "contextlib2-21.6.0-py2.py3-none-any.whl", hash = "sha256:3fbdb64466afd23abaf6c977627b75b6139a5a3e8ce38405c5b413aed7a0471f"},
+    {file = "contextlib2-21.6.0.tar.gz", hash = "sha256:ab1e2bfe1d01d968e1b7e8d9023bc51ef3509bba217bb730cee3827e1ee82869"},
+]
+
+[[package]]
 name = "cyclonedx-python-lib"
 version = "4.2.3"
 description = "A library for producing CycloneDX SBOM (Software Bill of Materials) files."
@@ -367,17 +378,6 @@ gitdb = ">=4.0.1,<5"
 
 [package.extras]
 test = ["black", "coverage[toml]", "ddt (>=1.1.1,!=1.4.3)", "mock", "mypy", "pre-commit", "pytest", "pytest-cov", "pytest-instafail", "pytest-subtests", "pytest-sugar"]
-
-[[package]]
-name = "contextlib2"
-version = "21.6.0"
-description = "Backports and enhancements for the contextlib module"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "contextlib2-21.6.0-py2.py3-none-any.whl", hash = "sha256:3fbdb64466afd23abaf6c977627b75b6139a5a3e8ce38405c5b413aed7a0471f"},
-    {file = "contextlib2-21.6.0.tar.gz", hash = "sha256:ab1e2bfe1d01d968e1b7e8d9023bc51ef3509bba217bb730cee3827e1ee82869"},
-]
 
 [[package]]
 name = "h11"
@@ -1392,6 +1392,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "ef3f6ec740f2c81f3d6b24d730af5876c3d748dea25190d230578ed8e30312a2"
-content-hash = "45f2c7ed7beedbbb8ba0ca3dd0924c392ec9448f55f91caabc65b5e4b40f4c1c"
-content-hash = "a8f6551911bb9d8ad623b9edeb0d95b854c0e2842ad0fa73dab03d1c04ad8b92"
+content-hash = "7891c242e1b8141933d0659bd334e041b8eb64e93ffdc10d5e9882a8bce04ab9"
