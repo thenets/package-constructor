@@ -239,20 +239,8 @@ def run_script(multi_line_script, cwd: str = None) -> None:
     logger.debug(f"Run script: {tmp_script_path}")
     logger.debug(f"CWD: {cwd}")
     logger.debug(f"Script:\n{multi_line_script}")
-    try:
-        out = subprocess.run(
-            ["bash", tmp_script_path],
-            cwd=cwd,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        logger.error(f"CMD: {e.cmd}")
-        logger.error(e.stderr.decode("utf-8"))
-        exit(1)
-    return out
+    check_output(["chmod", "+x", tmp_script_path])
+    check_output(["bash", tmp_script_path], cwd=cwd)
 
 
 def git_pull(
@@ -268,9 +256,15 @@ def git_pull(
 
     _parent_dir = os.path.dirname(path)
     os.makedirs(_parent_dir, exist_ok=True)
+    _command_clone = f"git clone --depth 1 --branch {ref} {url} {path}"
+    if os.path.isdir(os.path.join(path, ".git")):
+        logger.debug("Git repository identified. Skipping clone")
+        _command_clone = ""
+    else:
+        _command_clone = f"git clone --depth 1 --branch {ref} {url} {path}"
     commands = [
         "set -ex",
-        f"git clone --depth 1 --branch {ref} {url} {path}",
+        _command_clone,
         # If the repository already exists, force the checkout again
         f"cd {path}",
         f"git checkout {ref}",
@@ -295,6 +289,8 @@ def create_file_from_template(
     )
     template = template_env.from_string(template_string)
     template_result = template.render(template_data)
+    _parent_dir = os.path.dirname(output_path)
+    os.makedirs(_parent_dir, exist_ok=True)
     with open(output_path, "w") as f:
         f.write(template_result)
 

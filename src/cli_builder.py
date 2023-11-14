@@ -499,6 +499,7 @@ class Builder:
         for source in self.config.sources:
             _source_path = os.path.join(
                 self.config.workdir.path,
+                "constructor/sources/",
                 source.path,
             )
             if source.kind == "git":
@@ -512,8 +513,6 @@ class Builder:
                 logger.error("Unsupported source kind: " + source.kind)
                 exit(1)
         
-        exit(0)
-
     def _setup_package_managers(self):
         def _create_python_dependencies_files(in_dependencies) -> list:
             """Get the list of Python dependencies
