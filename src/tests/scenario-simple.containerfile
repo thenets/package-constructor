@@ -2,6 +2,8 @@ FROM my.local/base-image
 
 ADD constructor /constructor
 
+ENV PIP_NO_BINARY=:all:
+
 RUN set -x \
     && dnf install -y python3-pip \
     && python3 -m venv /venv \
