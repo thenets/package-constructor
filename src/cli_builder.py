@@ -409,6 +409,11 @@ class Builder:
                         ],
                     },
                     Optional("python"): {
+                        "pythonVersion": And(
+                            str,
+                            len,
+                            error="Invalid pythonVersion. Valid example: ^3.9",
+                        ),
                         "includeDependencies": And(bool),
                         "dependencies": [
                             And(
@@ -492,6 +497,116 @@ class Builder:
     def _pull_sources(self):
         pass
 
+    def _setup_package_managers(self):
+        def _create_python_dependencies_files(in_dependencies) -> list:
+            """Get the list of Python dependencies
+
+            Use poetry to get the list of dependencies
+            """
+            _python_base_path = os.path.join(
+                self.config.workdir.path,
+                "constructor/packagemanager/python",
+            )
+
+            if not self.config.packageManagers.python.includeDependencies:
+                # Write the dependencies to $WORKDIR/constructor/packagemanager/python/requirements-freeze.txt
+                # but create the directory first
+                all_dependencies = []
+                os.makedirs(_python_base_path, exist_ok=True)
+                with open(
+                    os.path.join(_python_base_path, "requirements-freeze.txt"),
+                    "w",
+                ) as f:
+                    f.write("\n".join(in_dependencies))
+
+                return list(self.config.packageManagers.python.dependencies)
+
+            # Use poetry
+            # Create the pyproject.toml file
+            _pyproject_toml_path = os.path.join(
+                _python_base_path,
+                "pyproject.toml",
+            )
+            logger.info("Creating pyproject.toml file: " + _pyproject_toml_path)
+            template_string = """[tool.poetry]
+name = "test"
+version = "0.0.1"
+description = "test"
+authors = ["test"]
+
+[tool.poetry.dependencies]
+python = "{{ pythonVersion }}"
+{% for dependency in dependencies %}
+{{ dependency }}
+{% endfor %}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+"""
+            _parsed_dependencies = []
+            for dependency in in_dependencies:
+                _parsed_dependencies.append(
+                    f'{dependency.split("==")[0]} = \"{dependency.split("==")[1]}\"'
+                )
+            print(_parsed_dependencies)
+            template_data = {
+                "pythonVersion": self.config.packageManagers.python.pythonVersion,
+                "dependencies": _parsed_dependencies,
+            }
+            common.create_file_from_template(
+                _pyproject_toml_path,
+                template_string,
+                template_data,
+            )
+
+            # Create extract-dependencies.sh
+            _extract_dependencies_sh_path = os.path.join(
+                _python_base_path,
+                "extract-dependencies.sh",
+            )
+            logger.info(
+                "Creating extract-dependencies.sh file: "
+                + _extract_dependencies_sh_path
+            )
+            template_string = """#!/bin/sh
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+set -ex
+export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+
+cd $SCRIPT_DIR
+
+rm -f ./requirements-freeze.txt
+rm -f ./poetry.lock
+
+python3 -m venv poetry-venv
+./poetry-venv/bin/pip install -U pip
+./poetry-venv/bin/pip install poetry poetry-plugin-export
+cat pyproject.toml
+./poetry-venv/bin/poetry install --no-root --all-extras
+./poetry-venv/bin/poetry export --without-hashes --all-extras --format=requirements.txt > ./requirements-freeze.txt
+"""
+            common.create_file_from_template(
+                _extract_dependencies_sh_path,
+                template_string,
+                {},
+            )
+            common.run(["chmod", "+x", _extract_dependencies_sh_path])
+
+            # Run extract-dependencies.sh
+            logger.info("Running extract-dependencies.sh")
+            common.check_output([_extract_dependencies_sh_path])
+
+
+        if "ansible" in self.config.packageManagers:
+            # TODO
+            pass
+
+        if "python" in self.config.packageManagers:
+            _python_all_dependencies = _create_python_dependencies_files(
+                self.config.packageManagers.python.dependencies
+            )
+
     def _build_image(self, container: dict):
         """Build the container image"""
         _containerfile_path = None
@@ -501,7 +616,6 @@ class Builder:
             _containerfile_path = os.path.join(
                 self.config.workdir.path, container.containerfilePath
             )
-            # copy
             logger.info("Copying Containerfile: " + _containerfile_path)
             _original_file_path = os.path.join(
                 os.path.dirname(self.config_file_path),
@@ -540,6 +654,8 @@ class Builder:
 
     def build(self):
         self._pull_sources()
+        self._setup_package_managers()
+
         for container in self.config.containers:
             self._build_image(container)
 

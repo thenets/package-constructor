@@ -38,11 +38,13 @@ packageManagers:
   # Python package manager
   # creates the file $WORKDIR/constructor/packagemanager/python/requirements-freeze.txt
   python:
+    pythonVersion: "^3.9"
     # If true, it will search for all the dependencies to build the package
     includeDependencies: true
     # Dependencies. Must include the package name and version
     dependencies:
       - cryptography==41.0.5
+      - ansible==8.6.1
 
 # Assuming "kind: containers", the container key is required
 # Each container will be built sequentially. You can chain them.

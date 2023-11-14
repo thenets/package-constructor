@@ -12,6 +12,7 @@ import os
 import subprocess
 import time
 
+import jinja2
 import requests
 
 requests_s = requests.Session()
@@ -199,7 +200,12 @@ def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
 def check_output(args, **kwargs):
     """Run a command and return the output"""
     cmd_log(list(args))
-    return subprocess.check_output(args, **kwargs)
+    try:
+        out = subprocess.check_output(args, **kwargs)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"CMD: {e.cmd}")
+        exit(1)
+    return out
 
 
 def check_executable(cmd: str) -> bool:
@@ -210,6 +216,26 @@ def check_executable(cmd: str) -> bool:
         return True
     except:
         return False
+
+
+def create_file_from_template(
+    output_path: str, template_string: str, template_data: dict
+):
+    """Create a file from a template
+
+    Args:
+        template_string (str): Template string
+        template_data (dict): Template data. Example: {"name": "John"}
+        output_path (str): Output file path
+    """
+    # Create the pyproject.toml file
+    template_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader("."), autoescape=False
+    )
+    template = template_env.from_string(template_string)
+    template_result = template.render(template_data)
+    with open(output_path, "w") as f:
+        f.write(template_result)
 
 
 def get_services(cachito_repo_path: str):
