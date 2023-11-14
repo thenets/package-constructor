@@ -325,7 +325,7 @@ def cmd_pip_generate(requirements_file_in, requirements_file_out):
         f.write(out)
 
 
-class Builder():
+class Builder:
     config = None
 
     def __init__(self, config_file_path: str):
@@ -343,6 +343,7 @@ class Builder():
         with open(config_file_path, "r") as f:
             config_file_content = f.read()
             import yaml
+
             config_data = yaml.safe_load(config_file_content)
         if not self._is_config_file_valid(config_data):
             logger.error("Config file is not valid: " + config_file_path)
@@ -370,6 +371,14 @@ class Builder():
             match = "^https?:\/\/.*$"
             return bool(re.match(match, s))
 
+        def _validate_name_n_version(s):
+            """Validates name and version"""
+            import re
+
+            # format: <name>==<num>.<num>.<num>
+            match = "^[a-zA-Z0-9\.\-_]+==[0-9]+\.[0-9]+\.[0-9]+$"
+            return bool(re.match(match, s))
+
         schema_template = Schema(
             {
                 "kind": And(
@@ -379,6 +388,37 @@ class Builder():
                 ),
                 "workdir": {
                     "path": And(str, len, error="Invalid path."),
+                },
+                "packageManagers": {
+                    Optional("ansible"): {
+                        Optional("collections"): [
+                            And(
+                                str,
+                                len,
+                                _validate_name_n_version,
+                                error="Invalid name and version format. Valid example: community-general==6.2.0",
+                            )
+                        ],
+                        Optional("roles"): [
+                            And(
+                                str,
+                                len,
+                                _validate_name_n_version,
+                                error="Invalid name and version format. Valid example: cloudalchemy.node_exporter==2.0.0",
+                            )
+                        ],
+                    },
+                    Optional("python"): {
+                        "includeDependencies": And(bool),
+                        "dependencies": [
+                            And(
+                                str,
+                                len,
+                                _validate_name_n_version,
+                                error="Invalid name and version format. Valid example: ansible-core==2.14.11",
+                            )
+                        ],
+                    },
                 },
                 "sources": [
                     {
@@ -397,74 +437,116 @@ class Builder():
                         "path": And(str, len, error="Invalid path."),
                     }
                 ],
-                "container": {
-                    "containerImageName": And(str, len),
-                    "containerfilePath": And(str, len),
-                    "baseImage": {
-                        "name": And(str, len),
-                        Optional("content"): And(str, len),
-                    },
-                    "restrictions": {
-                        "disableDnsResolution": And(bool),
-                    },
-                    "proxies": {
-                        "python": And(bool),
-                        "golang": And(bool),
-                    },
-                    "sources_subpath": And(str, len),
-                    "podmanCacheEnabled": And(bool),
-                },
+                "containers": [
+                    {
+                        "imageName": And(str, len),
+                        Optional("containerfilePath"): And(str, len),
+                        Optional("containerfileContent"): And(str, len),
+                        "restrictions": {
+                            "disableDnsResolution": And(bool),
+                        },
+                        "proxies": {
+                            "python": And(bool),
+                            "golang": And(bool),
+                        },
+                        "sources_subpath": And(str, len),
+                        "podmanCacheEnabled": And(bool),
+                    }
+                ],
             }
         )
 
         try:
             schema_template.validate(config)
-            return True
         except SchemaError as e:
             logger.error(e)
             return False
 
+        # Must have at one of the following: containerfilePath, containerfileContent
+        for container in config["containers"]:
+            try:
+                path = container["containerfilePath"]
+            except:
+                path = ""
+            try:
+                content = container["containerfileContent"]
+            except:
+                content = ""
+            if not path and not content:
+                logger.error(f"Container: {container['imageName']}")
+                logger.error("├─ ContainerfilePath and containerfileContent not found")
+                logger.error("├─ One of the above must be present")
+                logger.error("└─ Aborting...")
+                exit(1)
+            if path and content:
+                logger.error(f"Container: {container['imageName']}")
+                logger.error("├─ ContainerfilePath and containerfileContent found")
+                logger.error("├─ Only one of the above must be present")
+                logger.error("└─ Aborting...")
+                exit(1)
+
+        # TODO: each container.imageName must be unique
+
+        return True
+
     def _pull_sources(self):
         pass
 
-    def _build_base_image(self):
-        """Build the base image"""
+    def _build_image(self, container: dict):
+        """Build the container image"""
+        _containerfile_path = None
+
         # Pull the base image if content is not present
-        if not self.config.container.baseImage.content:
-            logger.info("Pulling base image: " + self.config["container"]["baseImage"]["name"])
-            common.check_output(
-                [
-                    "podman",
-                    "pull",
-                    self.config["container"]["baseImage"]["name"],
-                ]
+        if container.containerfilePath:
+            _containerfile_path = os.path.join(
+                self.config.workdir.path, container.containerfilePath
             )
-            return
+            # copy
+            logger.info("Copying Containerfile: " + _containerfile_path)
+            _original_file_path = os.path.join(
+                os.path.dirname(self.config_file_path),
+                container.containerfilePath,
+            )
+            common.check_output(["cp", _original_file_path, _containerfile_path])
+        else:
+            _containerfile_path = os.path.join(
+                self.config.workdir.path, "base_image.containerfile"
+            )
+            logger.info("Creating Containerfile: " + _containerfile_path)
+            with open(_containerfile_path, "w") as f:
+                f.write(container.containerfileContent)
 
-        # Create the Containerfile
-        containerfile_path = os.path.join(self.config.workdir.path, "base_image.containerfile")
-        logger.info("Creating Containerfile: " + containerfile_path)
-        with open(containerfile_path, "w") as f:
-            f.write(self.config.container.baseImage.content)
-
-        # Build the base image
-        logger.info("Building base image")
+        # Build the image
+        logger.info(f"Building image: {container.imageName}")
+        _build_args = []
+        if not container.podmanCacheEnabled:
+            _build_args.append("--no-cache")
+        if container.restrictions.disableDnsResolution:
+            _build_args.append("--dns=none")
         common.check_output(
             [
                 "podman",
                 "build",
+            ]
+            + _build_args
+            + [
                 "-f",
-                containerfile_path,
+                _containerfile_path,
                 "-t",
-                self.config.container.containerImageName,
+                container.imageName,
                 self.config.workdir.path,
             ]
         )
 
     def build(self):
         self._pull_sources()
-        self._build_base_image()
+        for container in self.config.containers:
+            self._build_image(container)
 
+        # Success message
+        logger.info("Images built successfully")
+        for container in self.config.containers:
+            logger.info(f"├─ {container.imageName}")
 
 
 @click.command()
@@ -479,9 +561,6 @@ def cmd_run(config_file):
     builder = Builder(config_file)
     logger.info("Workdir: " + builder.config.workdir.path)
     builder.build()
-
-
-
 
 
 # Click

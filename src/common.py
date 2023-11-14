@@ -27,9 +27,14 @@ class dotdict(dict):
         # recursively convert nested dicts
         for arg in args:
             if isinstance(arg, dict):
+                pass
                 for k, v in arg.items():
                     if isinstance(v, dict):
                         v = dotdict(v)
+                    elif isinstance(v, list):
+                        for i in range(len(v)):
+                            if isinstance(v[i], dict):
+                                v[i] = dotdict(v[i])
                     self[k] = v
         if kwargs:
             for k, v in kwargs.items():
@@ -38,6 +43,7 @@ class dotdict(dict):
                 self[k] = v
 
     def __getattr__(self, attr):
+        # BUG: when the key is not present, it returns None instead of raising an error
         return self.get(attr)
 
     def __setattr__(self, key, value):
