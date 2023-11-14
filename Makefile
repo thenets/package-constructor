@@ -18,9 +18,9 @@ clean:
 
 .PHONY: fmt
 fmt: venv
-	./venv/bin/isort ./src/
-	./venv/bin/black -q ./src/
-	./venv/bin/ruff --fix ./src/
+	./venv/bin/isort ./src/ --skip-glob '*/cache/*'
+	./venv/bin/black -q ./src/ --force-exclude 'cache/'
+	./venv/bin/ruff --fix ./src/ --exclude '*/cache/*'
 
 .PHONY: lint
 lint: venv

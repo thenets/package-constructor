@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
 import time
 
 import jinja2
@@ -216,6 +217,66 @@ def check_executable(cmd: str) -> bool:
         return True
     except:
         return False
+
+
+def run_script(multi_line_script, cwd: str = None) -> None:
+    """Run a multi-line bash script
+
+    Args:
+        multi_line_script (str|list): Multi-line bash script. If it is a list, it will be joined with "\n"
+        cwd (str): Current working directory
+    """
+    if not multi_line_script or cwd is None:
+        logger.error("run_script: multi_line_script or cwd is None")
+        exit(1)
+    if isinstance(multi_line_script, list):
+        multi_line_script = "#!/bin/bash\n\n" + "\n".join(multi_line_script)
+
+    tmp_script_path = tempfile.mktemp()
+    with open(tmp_script_path, "w") as f:
+        f.write(multi_line_script)
+
+    logger.debug(f"Run script: {tmp_script_path}")
+    logger.debug(f"CWD: {cwd}")
+    logger.debug(f"Script:\n{multi_line_script}")
+    try:
+        out = subprocess.run(
+            ["bash", tmp_script_path],
+            cwd=cwd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        logger.error(f"CMD: {e.cmd}")
+        logger.error(e.stderr.decode("utf-8"))
+        exit(1)
+    return out
+
+
+def git_pull(
+    url,
+    ref,
+    path,
+):
+    """Clone a git repository"""
+    if path[0] != "/":
+        logger.error("Path must be absolute (starting with /)")
+        logger.error(f"Path: {path}")
+        exit(1)
+
+    _parent_dir = os.path.dirname(path)
+    os.makedirs(_parent_dir, exist_ok=True)
+    commands = [
+        "set -ex",
+        f"git clone --depth 1 --branch {ref} {url} {path}",
+        # If the repository already exists, force the checkout again
+        f"cd {path}",
+        f"git checkout {ref}",
+        f"git pull origin {ref}",
+    ]
+    run_script(commands, cwd=_parent_dir)
 
 
 def create_file_from_template(

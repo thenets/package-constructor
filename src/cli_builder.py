@@ -375,8 +375,8 @@ class Builder:
             """Validates name and version"""
             import re
 
-            # format: <name>==<num>.<num>.<num>
-            match = "^[a-zA-Z0-9\.\-_]+==[0-9]+\.[0-9]+\.[0-9]+$"
+            # format: <name>==<num>optional(.<num>)*2
+            match = "^[a-zA-Z0-9\.\-_]+==[0-9]+(\.[0-9]+)*$"
             return bool(re.match(match, s))
 
         schema_template = Schema(
@@ -495,7 +495,24 @@ class Builder:
         return True
 
     def _pull_sources(self):
-        pass
+        """Pull the sources"""
+        for source in self.config.sources:
+            _source_path = os.path.join(
+                self.config.workdir.path,
+                source.path,
+            )
+            if source.kind == "git":
+                logger.info("Pulling source [git]: " + _source_path)
+                common.git_pull(
+                    source.url,
+                    source.ref,
+                    _source_path,
+                )
+            else:
+                logger.error("Unsupported source kind: " + source.kind)
+                exit(1)
+        
+        exit(0)
 
     def _setup_package_managers(self):
         def _create_python_dependencies_files(in_dependencies) -> list:
@@ -511,7 +528,6 @@ class Builder:
             if not self.config.packageManagers.python.includeDependencies:
                 # Write the dependencies to $WORKDIR/constructor/packagemanager/python/requirements-freeze.txt
                 # but create the directory first
-                all_dependencies = []
                 os.makedirs(_python_base_path, exist_ok=True)
                 with open(
                     os.path.join(_python_base_path, "requirements-freeze.txt"),
@@ -536,7 +552,7 @@ authors = ["test"]
 
 [tool.poetry.dependencies]
 python = "{{ pythonVersion }}"
-{% for dependency in dependencies %}
+{% for dependency in dependencies -%}
 {{ dependency }}
 {% endfor %}
 
@@ -547,7 +563,7 @@ build-backend = "poetry.core.masonry.api"
             _parsed_dependencies = []
             for dependency in in_dependencies:
                 _parsed_dependencies.append(
-                    f'{dependency.split("==")[0]} = \"{dependency.split("==")[1]}\"'
+                    f'{dependency.split("==")[0]} = "{dependency.split("==")[1]}"'
                 )
             print(_parsed_dependencies)
             template_data = {
@@ -572,7 +588,9 @@ build-backend = "poetry.core.masonry.api"
             template_string = """#!/bin/sh
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 set -ex
+
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+export PIP_NO_BINARY=:all:
 
 cd $SCRIPT_DIR
 
@@ -583,7 +601,7 @@ python3 -m venv poetry-venv
 ./poetry-venv/bin/pip install -U pip
 ./poetry-venv/bin/pip install poetry poetry-plugin-export
 cat pyproject.toml
-./poetry-venv/bin/poetry install --no-root --all-extras
+./poetry-venv/bin/poetry install --no-root --all-extras --compile --no-cache
 ./poetry-venv/bin/poetry export --without-hashes --all-extras --format=requirements.txt > ./requirements-freeze.txt
 """
             common.create_file_from_template(
@@ -596,7 +614,6 @@ cat pyproject.toml
             # Run extract-dependencies.sh
             logger.info("Running extract-dependencies.sh")
             common.check_output([_extract_dependencies_sh_path])
-
 
         if "ansible" in self.config.packageManagers:
             # TODO
