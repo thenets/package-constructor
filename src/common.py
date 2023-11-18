@@ -184,13 +184,75 @@ def cmd_log(cmd: list, cwd: str = None) -> None:
     logger.debug(out)
 
 
-def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
-    """Run a command"""
+def run(cmd: list, cwd=None, check=True, print_output=False) -> dotdict:
+    """Run a command
+
+    Args:
+        cmd (list): Command to run
+        cwd (str): Current working directory
+        check (bool): Raise an exception if the command fails
+        print_output (bool): Print the output to stdout and stderr
+
+    Returns:
+        dotdict: Dictionary with the following keys:
+            - stdout: stdout
+            - stderr: stderr
+            - exit_code: exit code
+    """
+    # Based on https://stackoverflow.com/questions/17190221/subprocess-popen-cloning-stdout-and-stderr-both-to-terminal-and-variables/25960956#25960956
+    import asyncio
+    import io
+    import sys
+    from subprocess import SubprocessError
+
+    # Maximum number of bytes to read at once from the 'asyncio.subprocess.PIPE'
+    _MAX_BUFFER_CHUNK_SIZE = 1024
+
+    async def run_cmd_async(command, cwd=None, check=False, print_output=False):
+        stdout_buffer = io.BytesIO()
+        stderr_buffer = io.BytesIO()
+        process = await asyncio.subprocess.create_subprocess_exec(
+            *command,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        async def write_stdout() -> None:
+            assert process.stdout is not None
+            while chunk := await process.stdout.read(_MAX_BUFFER_CHUNK_SIZE):
+                stdout_buffer.write(chunk)
+                if print_output:
+                    print(chunk.decode(), end="", flush=True)
+
+        async def write_stderr() -> None:
+            assert process.stderr is not None
+            while chunk := await process.stderr.read(_MAX_BUFFER_CHUNK_SIZE):
+                stderr_buffer.write(chunk)
+                if print_output:
+                    print(chunk.decode(), file=sys.stderr, end="", flush=True)
+
+        async with asyncio.TaskGroup() as task_group:
+            task_group.create_task(write_stdout())
+            task_group.create_task(write_stderr())
+
+            exit_code = await process.wait()
+            if check and exit_code != 0:
+                raise SubprocessError(
+                    f"Command '{command}' returned non-zero exit status {exit_code}."
+                )
+
+        out = {
+            "stdout": stdout_buffer.getvalue().decode(),
+            "stderr": stderr_buffer.getvalue().decode(),
+            "exit_code": exit_code,
+        }
+
+        return dotdict(out)
+
     cmd_log(cmd, cwd=cwd)
     try:
-        out = subprocess.run(
-            cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
-        )
+        out = asyncio.run(run_cmd_async(cmd, cwd=cwd, check=check))
     except subprocess.CalledProcessError as e:
         logger.error(f"CMD: {e.cmd}")
         logger.error(e.stderr.decode("utf-8"))
@@ -274,7 +336,7 @@ def git_pull(
 
 
 def create_file_from_template(
-    output_path: str, template_string: str, template_data: dict
+    output_path: str, template_string: str, template_data: dict, post_process=None
 ):
     """Create a file from a template
 
@@ -282,6 +344,7 @@ def create_file_from_template(
         template_string (str): Template string
         template_data (dict): Template data. Example: {"name": "John"}
         output_path (str): Output file path
+        post_process (function): Function to post-process the template result
     """
     # Create the pyproject.toml file
     template_env = jinja2.Environment(
@@ -289,6 +352,8 @@ def create_file_from_template(
     )
     template = template_env.from_string(template_string)
     template_result = template.render(template_data)
+    if post_process:
+        template_result = post_process(template_result)
     _parent_dir = os.path.dirname(output_path)
     os.makedirs(_parent_dir, exist_ok=True)
     with open(output_path, "w") as f:

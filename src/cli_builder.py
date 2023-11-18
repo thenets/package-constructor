@@ -8,6 +8,8 @@ import common
 _global = common.get_global()
 logger = common.get_logger()
 
+_cachito_repo_path = common.get_cachito_repository_path()
+
 
 def _new_template_interceptor(container_file_path: str, services: dict) -> str:
     """Intercept the Containerfile and create a new one with the Cachito instructions.
@@ -444,6 +446,7 @@ class Builder:
                 ],
                 "containers": [
                     {
+                        "name": And(str, len),  # TODO: validate [a-z0-9\-_]
                         "imageName": And(str, len),
                         Optional("containerfilePath"): And(str, len),
                         Optional("containerfileContent"): And(str, len),
@@ -512,7 +515,7 @@ class Builder:
             else:
                 logger.error("Unsupported source kind: " + source.kind)
                 exit(1)
-        
+
     def _setup_package_managers(self):
         def _create_python_dependencies_files(in_dependencies) -> list:
             """Get the list of Python dependencies
@@ -598,7 +601,8 @@ rm -f ./poetry.lock
 
 python3 -m venv poetry-venv
 ./poetry-venv/bin/pip install -U pip
-./poetry-venv/bin/pip install poetry poetry-plugin-export
+./poetry-venv/bin/pip install poetry 
+./poetry-venv/bin/pip install poetry-plugin-export
 cat pyproject.toml
 ./poetry-venv/bin/poetry install --no-root --all-extras --compile --no-cache
 ./poetry-venv/bin/poetry export --without-hashes --all-extras --format=requirements.txt > ./requirements-freeze.txt
@@ -612,7 +616,7 @@ cat pyproject.toml
 
             # Run extract-dependencies.sh
             logger.info("Running extract-dependencies.sh")
-            common.check_output([_extract_dependencies_sh_path])
+            common.run([_extract_dependencies_sh_path])
 
         if "ansible" in self.config.packageManagers:
             # TODO
@@ -637,7 +641,7 @@ cat pyproject.toml
                 os.path.dirname(self.config_file_path),
                 container.containerfilePath,
             )
-            common.check_output(["cp", _original_file_path, _containerfile_path])
+            common.run(["cp", _original_file_path, _containerfile_path])
         else:
             _containerfile_path = os.path.join(
                 self.config.workdir.path, "base_image.containerfile"
@@ -653,7 +657,7 @@ cat pyproject.toml
             _build_args.append("--no-cache")
         if container.restrictions.disableDnsResolution:
             _build_args.append("--dns=none")
-        common.check_output(
+        common.run(
             [
                 "podman",
                 "build",
@@ -668,9 +672,84 @@ cat pyproject.toml
             ]
         )
 
+    def _build_proxy(self):
+        # Create's the proxy script at
+        # $WORKDIR/constructor/proxy/<container.name>/proxy.sh
+
+        services = common.get_services(_cachito_repo_path)
+        networks = [service["network"] for service in services.values()]
+        if len(set(networks)) != 1:
+            logger.error("All services must use the same network")
+            exit(1)
+
+        template_string = """#!/bin/sh
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Get current -e and -x states
+_e=$(set +o | grep -q 'errexit'; echo $?)
+_x=$(set +o | grep -q 'xtrace'; echo $?)
+
+set -ex
+
+{% if container.proxies.python %}
+#<cachito-proxy> BEGIN
+export PIP_NO_BINARY=:all:
+# Special vars
+{%- for k, v in custom_envs.items() %}
+export {{ k }}={{ v }}
+{%- endfor %}
+#<cachito-proxy> END
+{% endif %}
+
+# Restore -e and -x states
+if [ $_e -eq 0 ]; then
+    set -e
+fi
+if [ $_x -eq 0 ]; then
+    set -x
+fi
+"""
+        # Create the proxy script per container
+        for container in self.config.containers:
+            template_data = {}
+            template_data["container"] = container
+            template_data["custom_envs"] = {}
+            for service in services.values():
+                if "custom_envs" in service.keys():
+                    template_data["custom_envs"].update(service["custom_envs"])
+
+            _proxy_sh_path = os.path.join(
+                self.config.workdir.path,
+                "constructor/proxy",
+                container.name,
+                "proxy.sh",
+            )
+            logger.info("Creating proxy script: " + _proxy_sh_path)
+            common.create_file_from_template(
+                _proxy_sh_path,
+                template_string,
+                template_data,
+                # Add new proxies to template_result
+                # TODO create new proxies instead of using the "cachito-pip-proxy"
+                lambda s: s.replace("<PIP_REPO_NAME>", "cachito-pip-proxy"),
+            )
+
+        pass
+
     def build(self):
         self._pull_sources()
         self._setup_package_managers()
+
+        # HACK: if any self.config.proxies is true, then restart the proxies
+        # _restart_proxies = any(self.config.proxies.values())
+        _restart_proxies = False
+        if _restart_proxies:
+            import cli_server
+
+            cli_server._check_dependencies()
+            cli_server.restart(_cachito_repo_path)
+
+        self._build_proxy()
 
         for container in self.config.containers:
             self._build_image(container)

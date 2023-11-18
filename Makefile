@@ -1,3 +1,5 @@
+include ./dev-tools/common.mk
+
 # =============
 # Utils
 # =============
@@ -17,6 +19,7 @@ clean:
 	rm -f requirements-freeze.txt
 
 .PHONY: fmt
+## Run code formatters and linters
 fmt: venv
 	./venv/bin/isort ./src/ --skip-glob '*/cache/*'
 	./venv/bin/black -q ./src/ --force-exclude 'cache/'
