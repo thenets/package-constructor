@@ -1,4 +1,4 @@
-# Cachito CLI
+# Package Constructor
 
 All you need to build packages and applications in an air-gapped environment. The power of `cachito` and `podman` combined.
 
@@ -15,78 +15,177 @@ through the Cachito proxy (Nexus pip proxy repo).
 
 ## Features
 
+Main features:
+- Build system configurable via a single YAML file
+
 Modules:
 - Server: Install the Cachito server with all the components
 - Builder: Build packages and applications in an air-gapped environment
 - Nexus: Check repositories and packages
 
 Additional features:
-- Log system
 - Python: Extract the `requirements.txt` from the Containerfile build using a proxy repository
 
-Pending features:
-
-- Configuration system via JSON/YAML
-- Cachito: removed. Pending to be refactored. Probably this should be integrated with the `cachi2` project.
+Pending features/tasks:
+- [ ] Automatically extract Python depenedencies based on the configuration file
+- [ ] Create new proxy pip repos per build instead of restart cachito and cleanup the cache
+- [ ] Each `Dockerfile` should be built with their own context. So, for all files from it's location must be copied to the workdir
 
 
 ## How to use
 
-Create a new cachito server:
+Add the `./bin/` to your `$PATH` var:
 
 ```bash
-# Create a new cachito server
-# --clone-path: the parent path must exist, then the clone path will be created
-mkdir -p /path/to/clone/cachito
-./bin/cachito server start \
-    --clone-path /path/to/clone/cachito/repo
+export $PATH=$(pwd)/bin/:${PATH}
 ```
 
-When you want to stop the server, the following command will also clean the volumes:
+Start all Cachito servers:
 
 ```bash
-./bin/cachito server stop \
-    --clone-path /path/to/clone/cachito/repo
+constructor
 ```
 
-Create the `Containerfile`. It must contain the `#<cachito-disable>` and `#<cachito-proxy>` lines:
+Create the `./Containerfile`. In order to use the internal Cachito servers you must load `constructor/proxy/<imageName>/proxy.sh` to your context:
 
 ```dockerfile
-# Containerfile
-FROM docker.io/alpine:latest
+# ./Containerfile
+FROM my.local/base-image
 
-#<cachito-disable>
+ADD constructor /constructor
 
-# Here you have access to the internet and can install the main packages
-RUN apk add py3-pip git
-RUN git clone https://github.com/ansible/receptor.git /src/receptor
+ENV PIP_NO_BINARY=:all:
 
-#<cachito-proxy>
+RUN set -x \
+    && source constructor/proxy/main/proxy.sh \
+    && python3 -m venv /venv \
+    && /venv/bin/pip3 install -r /constructor/packagemanager/python/requirements-freeze.txt
 
-# Here, you don't have access to the internet. The DNS resolution is disabled.
-# You can use `pip` and `go mod` to install packages from the proxy repositories.
-RUN pip install -U setuptools wheel
-RUN pip install requests
+RUN pip list -l > /hello.txt
 
-# Create wheel
-WORKDIR /src/receptor/receptorctl
-RUN echo "0.0.1" > .VERSION
-RUN mkdir /dist
-RUN pip wheel --wheel-dir=/dist .
+CMD ["cat", "/hello.txt"]
 ```
 
-Build a package:
+Create the main configuration file:
 
-```bash
-# Build a package
-./bin/cachito builder build \
-    -f ./path/to/Containerfile \
-    -t my-image:latest
+```yaml
+# Simplest scenario for the Package Constructor build system
+# - Container build
 
-# Check the new created files
-# (same path as the Containerfile)
-cat ./path/to/cachito.containerfile
-cat ./path/to/requirements.txt
+---
+
+# Defines the container build
+kind: container
+
+# Defines the working directory where the constructor will be executed
+# and will store all the generated files
+workdir:
+  # Path to the working directory relative to the configuration file
+  path: ./cache/
+
+# Each source will be cloned into a volume
+# and then added to the container build
+sources:
+  - kind: git
+    url: https://github.com/pyca/cryptography.git
+    ref: "41.0.5"
+    path: cryptography
+
+# Each package manager will have a respective proxy service available
+# for the container build
+packageManagers:
+  # Ansible roles and collections
+  # creates the files:
+  #   $WORKDIR/constructor/packagemanager/ansible/requirements.yml
+  #   $WORKDIR/constructor/packagemanager/ansible/requirements-freeze.txt
+  ansible:
+    # Collections. Must include the package name and version
+    collections:
+      - community-general==6.2.0
+    # Roles. Must include the package name and version
+    roles:
+      - cloudalchemy.node_exporter==2.0.0
+
+  # Python package manager
+  # creates the file $WORKDIR/constructor/packagemanager/python/requirements-freeze.txt
+  python:
+    pythonVersion: "^3.9"
+    # If true, it will search for all the dependencies to build the package
+    includeDependencies: true
+    # Dependencies. Must include the package name and version
+    dependencies:
+      - cryptography==41.0.5
+
+# Assuming "kind: containers", the container key is required
+# Each container will be built sequentially. You can chain them.
+containers:
+  # Base image
+  # ===================
+  - name: "base"
+    imageName: "my.local/base-image"
+    containerfileContent: |
+      FROM docker.io/redhat/ubi9:latest
+      RUN set x \
+          && dnf install -y \
+              # utils
+              tar vim bash findutils dnf \
+              # rust
+              cargo \
+              # gcc
+              gcc gcc-c++ cmake cmake-data \
+              # cryptography
+              libffi-devel openssl-devel redhat-rpm-config pkg-config \
+              # python
+              python3-devel \
+              python3-pip-wheel \
+              python3-setuptools \
+              python3-setuptools-wheel \
+              python3-wheel-wheel \
+              python3-six
+    restrictions:
+      disableDnsResolution: false
+    proxies:
+      python: false
+      golang: false
+    sources_subpath: sources
+    podmanCacheEnabled: true
+
+
+  # Main image
+  # ===================
+  - # Build name (required, must be unique, [a-z, 0-9, -])
+    name: "main"
+
+    # Podman image name (required)
+    imageName: "package-constructor-scenario-simple"
+
+    # Main Containerfile (required)
+    # This is where the main logic of the container build is defined
+    containerfilePath: ./scenario-simple.containerfile
+
+    # All restrictions applied during the build time
+    # if a build can be performed in a container with these restrictions
+    # it probably means that all the dependencies can be compiled in an
+    # air-gapped environment.
+    restrictions:
+      disableDnsResolution: true
+
+    # All proxies applied during the build time
+    # in order to enable them, you must source the proxy file
+    # example:
+    #   COPY constructor/proxy.sh /tmp/proxy.sh
+    #   RUN source /tmp/proxy.sh && pip install requests
+    proxies:
+      python: true
+      golang: true
+
+    # Sources subpath (default: sources)
+    # Available in the container build context
+    # Example: COPY sources /tmp/sources
+    sources_subpath: sources
+
+    # Cache enabled (default: true)
+    podmanCacheEnabled: false
 ```
 
 ## FAQ
@@ -95,4 +194,4 @@ cat ./path/to/requirements.txt
   Yes. There are probably design issues in how I architected the `cli_builder.py` module.
 
 - How do you deal with third-party bindings like `C`, `C++` or `Rust`?
-  I don't. All binding dependencies must come from the distro's package manager. For `Rust` specifically, none is supported since `cachito` don't yet support it.
+  I don't. All binding dependencies must come from the distro's package manager. For `Rust` specifically, none is supported since `cachito` don't yet support it, so you must vendor their lib, read more here at [cargo-vendor](https://doc.rust-lang.org/cargo/commands/cargo-vendor.html).

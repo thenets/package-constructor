@@ -218,14 +218,14 @@ def run(cmd: list, cwd=None, check=True, print_output=False) -> dotdict:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        async def write_stdout() -> None:
+        async def write_stdout(print_output: bool = False) -> None:
             assert process.stdout is not None
             while chunk := await process.stdout.read(_MAX_BUFFER_CHUNK_SIZE):
                 stdout_buffer.write(chunk)
                 if print_output:
                     print(chunk.decode(), end="", flush=True)
 
-        async def write_stderr() -> None:
+        async def write_stderr(print_output: bool = False) -> None:
             assert process.stderr is not None
             while chunk := await process.stderr.read(_MAX_BUFFER_CHUNK_SIZE):
                 stderr_buffer.write(chunk)
@@ -233,8 +233,8 @@ def run(cmd: list, cwd=None, check=True, print_output=False) -> dotdict:
                     print(chunk.decode(), file=sys.stderr, end="", flush=True)
 
         async with asyncio.TaskGroup() as task_group:
-            task_group.create_task(write_stdout())
-            task_group.create_task(write_stderr())
+            task_group.create_task(write_stdout(print_output=True))
+            task_group.create_task(write_stderr(print_output=True))
 
             exit_code = await process.wait()
             if check and exit_code != 0:
