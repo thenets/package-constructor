@@ -10,13 +10,57 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
 import time
 
+import jinja2
 import requests
 
 requests_s = requests.Session()
 requests_s.verify = False
 requests.packages.urllib3.disable_warnings()
+
+
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+
+    # Based on https://stackoverflow.com/questions/2352181/how-to-use-a-dot-to-access-members-of-dictionary
+    def __init__(self, *args, **kwargs):
+        # recursively convert nested dicts
+        for arg in args:
+            if isinstance(arg, dict):
+                pass
+                for k, v in arg.items():
+                    if isinstance(v, dict):
+                        v = dotdict(v)
+                    elif isinstance(v, list):
+                        for i in range(len(v)):
+                            if isinstance(v[i], dict):
+                                v[i] = dotdict(v[i])
+                    self[k] = v
+        if kwargs:
+            for k, v in kwargs.items():
+                if isinstance(v, dict):
+                    v = dotdict(v)
+                self[k] = v
+
+    def __getattr__(self, attr):
+        # BUG: when the key is not present, it returns None instead of raising an error
+        return self.get(attr)
+
+    def __setattr__(self, key, value):
+        self.__setitem__(key, value)
+
+    def __setitem__(self, key, value):
+        super(dotdict, self).__setitem__(key, value)
+        self.__dict__.update({key: value})
+
+    def __delattr__(self, item):
+        self.__delitem__(item)
+
+    def __delitem__(self, key):
+        super(dotdict, self).__delitem__(key)
+        del self.__dict__[key]
 
 
 def _setup_logger():
@@ -140,13 +184,75 @@ def cmd_log(cmd: list, cwd: str = None) -> None:
     logger.debug(out)
 
 
-def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
-    """Run a command"""
+def run(cmd: list, cwd=None, check=True, print_output=False) -> dotdict:
+    """Run a command
+
+    Args:
+        cmd (list): Command to run
+        cwd (str): Current working directory
+        check (bool): Raise an exception if the command fails
+        print_output (bool): Print the output to stdout and stderr
+
+    Returns:
+        dotdict: Dictionary with the following keys:
+            - stdout: stdout
+            - stderr: stderr
+            - exit_code: exit code
+    """
+    # Based on https://stackoverflow.com/questions/17190221/subprocess-popen-cloning-stdout-and-stderr-both-to-terminal-and-variables/25960956#25960956
+    import asyncio
+    import io
+    import sys
+    from subprocess import SubprocessError
+
+    # Maximum number of bytes to read at once from the 'asyncio.subprocess.PIPE'
+    _MAX_BUFFER_CHUNK_SIZE = 1024
+
+    async def run_cmd_async(command, cwd=None, check=False, print_output=False):
+        stdout_buffer = io.BytesIO()
+        stderr_buffer = io.BytesIO()
+        process = await asyncio.subprocess.create_subprocess_exec(
+            *command,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        async def write_stdout() -> None:
+            assert process.stdout is not None
+            while chunk := await process.stdout.read(_MAX_BUFFER_CHUNK_SIZE):
+                stdout_buffer.write(chunk)
+                if print_output:
+                    print(chunk.decode(), end="", flush=True)
+
+        async def write_stderr() -> None:
+            assert process.stderr is not None
+            while chunk := await process.stderr.read(_MAX_BUFFER_CHUNK_SIZE):
+                stderr_buffer.write(chunk)
+                if print_output:
+                    print(chunk.decode(), file=sys.stderr, end="", flush=True)
+
+        async with asyncio.TaskGroup() as task_group:
+            task_group.create_task(write_stdout())
+            task_group.create_task(write_stderr())
+
+            exit_code = await process.wait()
+            if check and exit_code != 0:
+                raise SubprocessError(
+                    f"Command '{command}' returned non-zero exit status {exit_code}."
+                )
+
+        out = {
+            "stdout": stdout_buffer.getvalue().decode(),
+            "stderr": stderr_buffer.getvalue().decode(),
+            "exit_code": exit_code,
+        }
+
+        return dotdict(out)
+
     cmd_log(cmd, cwd=cwd)
     try:
-        out = subprocess.run(
-            cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check
-        )
+        out = asyncio.run(run_cmd_async(cmd, cwd=cwd, check=check))
     except subprocess.CalledProcessError as e:
         logger.error(f"CMD: {e.cmd}")
         logger.error(e.stderr.decode("utf-8"))
@@ -157,7 +263,12 @@ def run(cmd: list, cwd=None, check=True) -> subprocess.CompletedProcess:
 def check_output(args, **kwargs):
     """Run a command and return the output"""
     cmd_log(list(args))
-    return subprocess.check_output(args, **kwargs)
+    try:
+        out = subprocess.check_output(args, **kwargs)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"CMD: {e.cmd}")
+        exit(1)
+    return out
 
 
 def check_executable(cmd: str) -> bool:
@@ -168,6 +279,85 @@ def check_executable(cmd: str) -> bool:
         return True
     except:
         return False
+
+
+def run_script(multi_line_script, cwd: str = None) -> None:
+    """Run a multi-line bash script
+
+    Args:
+        multi_line_script (str|list): Multi-line bash script. If it is a list, it will be joined with "\n"
+        cwd (str): Current working directory
+    """
+    if not multi_line_script or cwd is None:
+        logger.error("run_script: multi_line_script or cwd is None")
+        exit(1)
+    if isinstance(multi_line_script, list):
+        multi_line_script = "#!/bin/bash\n\n" + "\n".join(multi_line_script)
+
+    tmp_script_path = tempfile.mktemp()
+    with open(tmp_script_path, "w") as f:
+        f.write(multi_line_script)
+
+    logger.debug(f"Run script: {tmp_script_path}")
+    logger.debug(f"CWD: {cwd}")
+    logger.debug(f"Script:\n{multi_line_script}")
+    check_output(["chmod", "+x", tmp_script_path])
+    check_output(["bash", tmp_script_path], cwd=cwd)
+
+
+def git_pull(
+    url,
+    ref,
+    path,
+):
+    """Clone a git repository"""
+    if path[0] != "/":
+        logger.error("Path must be absolute (starting with /)")
+        logger.error(f"Path: {path}")
+        exit(1)
+
+    _parent_dir = os.path.dirname(path)
+    os.makedirs(_parent_dir, exist_ok=True)
+    _command_clone = f"git clone --depth 1 --branch {ref} {url} {path}"
+    if os.path.isdir(os.path.join(path, ".git")):
+        logger.debug("Git repository identified. Skipping clone")
+        _command_clone = ""
+    else:
+        _command_clone = f"git clone --depth 1 --branch {ref} {url} {path}"
+    commands = [
+        "set -ex",
+        _command_clone,
+        # If the repository already exists, force the checkout again
+        f"cd {path}",
+        f"git checkout {ref}",
+        f"git pull origin {ref}",
+    ]
+    run_script(commands, cwd=_parent_dir)
+
+
+def create_file_from_template(
+    output_path: str, template_string: str, template_data: dict, post_process=None
+):
+    """Create a file from a template
+
+    Args:
+        template_string (str): Template string
+        template_data (dict): Template data. Example: {"name": "John"}
+        output_path (str): Output file path
+        post_process (function): Function to post-process the template result
+    """
+    # Create the pyproject.toml file
+    template_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader("."), autoescape=False
+    )
+    template = template_env.from_string(template_string)
+    template_result = template.render(template_data)
+    if post_process:
+        template_result = post_process(template_result)
+    _parent_dir = os.path.dirname(output_path)
+    os.makedirs(_parent_dir, exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write(template_result)
 
 
 def get_services(cachito_repo_path: str):

@@ -1,0 +1,133 @@
+# Simplest scenario for the Package Constructor build system
+# - Container build
+
+---
+
+# Defines the container build
+kind: container
+
+# Defines the working directory where the constructor will be executed
+# and will store all the generated files
+workdir:
+  # Path to the working directory relative to the configuration file
+  path: ./cache/
+
+# Each source will be cloned into a volume
+# and then added to the container build
+sources:
+  - kind: git
+    url: https://github.com/pyca/cryptography.git
+    ref: "41.0.5"
+    path: cryptography
+
+# Each package manager will have a respective proxy service available
+# for the container build
+packageManagers:
+  # Ansible roles and collections
+  # creates the files:
+  #   $WORKDIR/constructor/packagemanager/ansible/requirements.yml
+  #   $WORKDIR/constructor/packagemanager/ansible/requirements-freeze.txt
+  ansible:
+    # Collections. Must include the package name and version
+    collections:
+      - community-general==6.2.0
+    # Roles. Must include the package name and version
+    roles:
+      - cloudalchemy.node_exporter==2.0.0
+
+  # Python package manager
+  # creates the file $WORKDIR/constructor/packagemanager/python/requirements-freeze.txt
+  python:
+    pythonVersion: "^3.9"
+    # If true, it will search for all the dependencies to build the package
+    includeDependencies: true
+    # Dependencies. Must include the package name and version
+    dependencies:
+      - cryptography==41.0.5
+      # - ansible==8.6.1
+      # - aiohttp==3.8.6
+      # - aiohttp-retry==2.8.3
+      # - backoff==2.2.1
+      # - beautifulsoup4==4.12.2
+      # - gitpython==3.1.40
+      # - packageurl-python==0.11.2
+      # - packaging==23.2
+      # - pydantic==2.5.0
+      # - pypi-simple==1.4.0
+      # - pyyaml==6.0.1
+      # - requests==2.31.0
+      # - semver==3.0.2
+      # - setuptools==68.2.2
+      # - tomli==2.0.1
+      # - typer==0.9.0
+
+# Assuming "kind: containers", the container key is required
+# Each container will be built sequentially. You can chain them.
+containers:
+  # Base image
+  # ===================
+  - name: "base"
+    imageName: "my.local/base-image"
+    containerfileContent: |
+      FROM docker.io/redhat/ubi9:latest
+      RUN set x \
+          && dnf install -y \
+              # utils
+              tar vim bash findutils dnf \
+              # rust
+              cargo \
+              # gcc
+              gcc gcc-c++ cmake cmake-data \
+              # cryptography
+              libffi-devel openssl-devel redhat-rpm-config pkg-config \
+              # python
+              python3-devel \
+              python3-pip-wheel \
+              python3-setuptools \
+              python3-setuptools-wheel \
+              python3-wheel-wheel \
+              python3-six
+    restrictions:
+      disableDnsResolution: false
+    proxies:
+      python: false
+      golang: false
+    sources_subpath: sources
+    podmanCacheEnabled: true
+
+
+  # Main image
+  # ===================
+  - # Build name (required, must be unique, [a-z, 0-9, -])
+    name: "main"
+
+    # Podman image name (required)
+    imageName: "package-constructor-scenario-simple"
+
+    # Main Containerfile (required)
+    # This is where the main logic of the container build is defined
+    containerfilePath: ./scenario-simple.containerfile
+
+    # All restrictions applied during the build time
+    # if a build can be performed in a container with these restrictions
+    # it probably means that all the dependencies can be compiled in an
+    # air-gapped environment.
+    restrictions:
+      disableDnsResolution: true
+
+    # All proxies applied during the build time
+    # in order to enable them, you must source the proxy file
+    # example:
+    #   COPY constructor/proxy.sh /tmp/proxy.sh
+    #   RUN source /tmp/proxy.sh && pip install requests
+    proxies:
+      python: true
+      golang: true
+
+    # Sources subpath (default: sources)
+    # Available in the container build context
+    # Example: COPY sources /tmp/sources
+    sources_subpath: sources
+
+    # Cache enabled (default: true)
+    podmanCacheEnabled: false
