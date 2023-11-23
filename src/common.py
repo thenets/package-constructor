@@ -233,8 +233,8 @@ def run(cmd: list, cwd=None, check=True, print_output=False) -> dotdict:
                     print(chunk.decode(), file=sys.stderr, end="", flush=True)
 
         async with asyncio.TaskGroup() as task_group:
-            task_group.create_task(write_stdout(print_output=True))
-            task_group.create_task(write_stderr(print_output=True))
+            task_group.create_task(write_stdout(print_output=print_output))
+            task_group.create_task(write_stderr(print_output=print_output))
 
             exit_code = await process.wait()
             if check and exit_code != 0:

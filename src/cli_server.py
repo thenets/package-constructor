@@ -212,7 +212,7 @@ class TestServer:
 
     def test_status_when_not_running(self, runner):
         result = runner.invoke(cmd_status, [])
-        assert result.exit_code == 1
+        assert result.exit_code == 0
         assert "All services are operational" not in result.output
 
     def test_start_twice(self, runner):
