@@ -17,6 +17,7 @@ venv:
 clean:
 	rm -rf venv/
 	rm -f requirements-freeze.txt
+	find . -name 'cache' -type d -exec rm -rf {} + || true
 
 .PHONY: fmt
 ## Run code formatters and linters
