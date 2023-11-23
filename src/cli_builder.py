@@ -601,7 +601,7 @@ rm -f ./poetry.lock
 
 python3 -m venv poetry-venv
 ./poetry-venv/bin/pip install -U pip
-./poetry-venv/bin/pip install poetry 
+./poetry-venv/bin/pip install poetry
 ./poetry-venv/bin/pip install poetry-plugin-export
 cat pyproject.toml
 ./poetry-venv/bin/poetry install --no-root --all-extras --compile --no-cache
@@ -630,6 +630,10 @@ cat pyproject.toml
     def _build_image(self, container: dict):
         """Build the container image"""
         _containerfile_path = None
+
+        if not common.is_running(_cachito_repo_path):
+            logger.error("Cachito server is not running")
+            exit(1)
 
         # Pull the base image if content is not present
         if container.containerfilePath:
@@ -669,12 +673,17 @@ cat pyproject.toml
                 "-t",
                 container.imageName,
                 self.config.workdir.path,
-            ]
+            ],
+            print_output=True,
         )
 
     def _build_proxy(self):
         # Create's the proxy script at
         # $WORKDIR/constructor/proxy/<container.name>/proxy.sh
+
+        if not common.is_running(_cachito_repo_path):
+            logger.error("Cachito server is not running")
+            exit(1)
 
         services = common.get_services(_cachito_repo_path)
         networks = [service["network"] for service in services.values()]

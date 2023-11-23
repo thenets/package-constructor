@@ -43,7 +43,7 @@ pip-audit = "^2.6.1"
 # Test
 [tool.pytest.ini_options]
 testpaths = ["./src", "./tests"]
-norecursedirs = ["./venv/", "./cache/", "./.ruff_cache/", "./build/"]
+norecursedirs = ["./venv/", "./cache/", "./.ruff_cache/", "./build/", "cache"]
 python_files = "*.py"
 python_functions = "test_* cli_*"
 python_classes = "Test*"

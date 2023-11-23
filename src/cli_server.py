@@ -59,38 +59,30 @@ def start(cachito_repo_path: str):
     compose = _get_compose_file_data(cachito_repo_path)
 
     # Fix nexus permissions
-    nexus_uid = (
-        common.run(
-            [
-                "podman",
-                "run",
-                "-it",
-                "--rm",
-                "--entrypoint=",
-                compose["services"]["nexus"]["image"],
-                "id",
-                "-u",
-            ]
-        )
-        .stdout.decode("utf-8")
-        .strip()
-    )
-    nexus_gid = (
-        common.run(
-            [
-                "podman",
-                "run",
-                "-it",
-                "--rm",
-                "--entrypoint=",
-                compose["services"]["nexus"]["image"],
-                "id",
-                "-g",
-            ]
-        )
-        .stdout.decode("utf-8")
-        .strip()
-    )
+    nexus_uid = common.run(
+        [
+            "podman",
+            "run",
+            "-it",
+            "--rm",
+            "--entrypoint=",
+            compose["services"]["nexus"]["image"],
+            "id",
+            "-u",
+        ]
+    ).stdout.strip()
+    nexus_gid = common.run(
+        [
+            "podman",
+            "run",
+            "-it",
+            "--rm",
+            "--entrypoint=",
+            compose["services"]["nexus"]["image"],
+            "id",
+            "-g",
+        ]
+    ).stdout.strip()
     logger.info("Setting up docker-compose.yml")
     volume_path = os.path.join(
         cachito_repo_path, compose["services"]["nexus"]["volumes"][0].split(":")[0]
@@ -182,7 +174,12 @@ def cmd_status():
         logger.error("Cachito repository does not exist")
         exit(1)
 
-    _print_status(_cachito_repo_path)
+    try:
+        _print_status(_cachito_repo_path)
+    except:
+        logger.error("Cachito server may not be running")
+        logger.error("Try starting it with 'cachito server start'")
+        exit(1)
 
 
 @click.command()
@@ -208,9 +205,15 @@ def click_add_group(cli: click.Group) -> None:
 class TestServer:
     def test_status(self, runner):
         # change cwd to something else
+        os.chdir("/tmp")
         result = runner.invoke(cmd_status, [])
         assert result.exit_code == 0
         assert "All services are operational" in result.output
+
+    def test_status_when_not_running(self, runner):
+        result = runner.invoke(cmd_status, [])
+        assert result.exit_code == 1
+        assert "All services are operational" not in result.output
 
     def test_start_twice(self, runner):
         result = runner.invoke(cmd_start, [])
