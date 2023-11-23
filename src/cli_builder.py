@@ -743,8 +743,6 @@ fi
                 lambda s: s.replace("<PIP_REPO_NAME>", "cachito-pip-proxy"),
             )
 
-        pass
-
     def build(self):
         self._pull_sources()
         self._setup_package_managers()
@@ -762,6 +760,14 @@ fi
 
         for container in self.config.containers:
             self._build_image(container)
+
+        dump_dependencies_from_cachito_pip_proxy_to_file(
+            _cachito_repo_path,
+            os.path.join(
+                self.config.workdir.path,
+                "requirements-from-proxy.txt",
+            ),
+        )
 
         # Success message
         logger.info("Images built successfully")
