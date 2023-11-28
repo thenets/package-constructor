@@ -98,7 +98,7 @@ def start(cachito_repo_path: str):
     time.sleep(30)
 
     # Get services data
-    services = common.get_services(cachito_repo_path)
+    services = common.get_services(cachito_repo_path, total_retries=10)
     logger.info("Services are operational")
     return services
 
@@ -151,9 +151,12 @@ def cmd_start():
     """start a new Cachito server with all the related services."""
     if common.is_running(_cachito_repo_path):
         click.echo("Cachito server is already running")
-        services = common.get_services(_cachito_repo_path)
-        _print_status(_cachito_repo_path, services)
-        exit(0)
+        try:
+            services = common.get_services(_cachito_repo_path, ignore_error_msg=True)
+            _print_status(_cachito_repo_path, services)
+            exit(0)
+        except:
+            pass
     services = start(_cachito_repo_path)
     _print_status(_cachito_repo_path, services)
 

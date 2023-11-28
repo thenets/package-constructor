@@ -121,6 +121,8 @@ def cmd_nexus_describe_repo(clone_path, repo_name, json):
         print(f"Error: {r.status_code}")
 
 
+# TODO def create_repo(repo_name: str, repo_type: str, repo_is_proxy: bool):
+
 # Click
 # ====================
 def click_add_group(cli: click.Group) -> None:

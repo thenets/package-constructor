@@ -360,8 +360,17 @@ def create_file_from_template(
         f.write(template_result)
 
 
-def get_services(cachito_repo_path: str):
-    """Get the services from the docker-compose.yml file"""
+def get_services(cachito_repo_path: str, total_retries: int = 0, ignore_error_msg: bool = False) -> dict:
+    """Get the services from the docker-compose.yml file
+
+    Args:
+        cachito_repo_path (str): Path to the Cachito repository
+        total_retries (int): Number of retries
+        ignore_error_msg (bool): Ignore error messages but still exit with code 1
+
+    Returns:
+        dict: all services
+    """
     services = {
         "athens": {},
         "nexus": {},
@@ -386,111 +395,128 @@ def get_services(cachito_repo_path: str):
     # Try to retrieve endpoints data
     # - Capture all requests exceptions (timeout and rc != 200)
     # - Exit if it fails
-    total_retries = 10
     sleep_time_seconds = 5
     retries = 0
+    def _get_services():
+        nonlocal cmd_out
+
+        containers = json.loads(cmd_out.stdout)
+        for container in containers:
+            service = {}
+            service["container_name"] = container["Names"][0]
+            service["network"] = container["Networks"][0]
+
+            # Athens
+            if f"{podman_project_name}_athens_1" in service["container_name"]:
+                if container["State"] != "running":
+                    logger.warning("Athens is not running")
+                    exit(1)
+                service["port"] = {
+                    "host": container["Ports"][0]["host_port"],
+                    "container": container["Ports"][0]["container_port"],
+                }
+                service[
+                    "url"
+                ] = f"http://host.containers.internal:{service['port']['host']}"
+                service["url_local"] = service["url"].replace(
+                    "host.containers.internal", "localhost"
+                )
+                r = requests.get(service["url_local"] + "/healthz")
+                if r.status_code != 200:
+                    logger.warning(f"Error connecting to Athens: {r.status_code}")
+                    exit(1)
+                service["custom_envs"] = {
+                    "GOPROXY": f"http://host.containers.internal:{service['port']['host']}",
+                }
+                services["athens"] = service
+
+            # Nexus
+            if f"{podman_project_name}_nexus_1" in service["container_name"]:
+                if container["State"] != "running":
+                    logger.warning("Nexus is not running")
+                    exit(1)
+                service["port"] = {
+                    "host": container["Ports"][0]["host_port"],
+                    "container": container["Ports"][0]["container_port"],
+                }
+                service[
+                    "url"
+                ] = f"http://host.containers.internal:{service['port']['host']}"
+                service["url_local"] = service["url"].replace(
+                    "host.containers.internal", "localhost"
+                )
+                r = requests.get(service["url_local"])
+                if r.status_code != 200:
+                    logger.warning(f"Error connecting to Nexus: {r.status_code}")
+                    exit(1)
+                service["custom_envs"] = {
+                    "PIP_TRUSTED_HOST": f"host.containers.internal:{service['port']['host']}",
+                    "PIP_INDEX": f"http://cachito:cachito@host.containers.internal:{service['port']['host']}/repository/<PIP_REPO_NAME>/pypi",
+                    "PIP_INDEX_URL": f"http://cachito:cachito@host.containers.internal:{service['port']['host']}/repository/<PIP_REPO_NAME>/simple",
+                }
+                services["nexus"] = service
+                # Test nexus credentials
+                nexus_user = "cachito"
+                nexus_pass = "cachito"
+                r = requests.get(
+                    service["url_local"] + "/service/rest/v1/repositories",
+                    auth=(nexus_user, nexus_pass),
+                )
+                if r.status_code != 200:
+                    logger.warning(
+                        f"Invalid credentials. Error connecting to Nexus: {r.status_code}"
+                    )
+                    exit(1)
+
+            # Cachito
+            if f"{podman_project_name}_cachito-api_1" in service["container_name"]:
+                if container["State"] != "running":
+                    logger.warning("Cachito is not running")
+                    exit(1)
+                service["port"] = {
+                    "host": container["Ports"][0]["host_port"],
+                    "container": container["Ports"][0]["container_port"],
+                }
+                service[
+                    "url"
+                ] = f"http://host.containers.internal:{service['port']['host']}"
+                service["url_local"] = service["url"].replace(
+                    "host.containers.internal", "localhost"
+                )
+                r = requests.get(service["url_local"] + "/api/v1/status/short")
+                if r.status_code != 200:
+                    logger.warning(f"Error connecting to Cachito: {r.status_code}")
+                    exit(1)
+                services["cachito"] = service
+        return services
+
+    # Try just once if total_retries is 0
+    if total_retries == 0:
+        try:
+            services = _get_services()
+            return services
+        except:
+            if not ignore_error_msg:
+                logger.error("Error getting services")
+            exit(1)
+
+    # Or try multiple times
     while retries != total_retries:
         try:
-            containers = json.loads(cmd_out.stdout)
-            for container in containers:
-                service = {}
-                service["container_name"] = container["Names"][0]
-                service["network"] = container["Networks"][0]
-
-                # Athens
-                if f"{podman_project_name}_athens_1" in service["container_name"]:
-                    if container["State"] != "running":
-                        logger.error("Athens is not running")
-                        exit(1)
-                    service["port"] = {
-                        "host": container["Ports"][0]["host_port"],
-                        "container": container["Ports"][0]["container_port"],
-                    }
-                    service[
-                        "url"
-                    ] = f"http://host.containers.internal:{service['port']['host']}"
-                    service["url_local"] = service["url"].replace(
-                        "host.containers.internal", "localhost"
-                    )
-                    r = requests.get(service["url_local"] + "/healthz")
-                    if r.status_code != 200:
-                        logger.error(f"Error connecting to Athens: {r.status_code}")
-                        exit(1)
-                    service["custom_envs"] = {
-                        "GOPROXY": f"http://host.containers.internal:{service['port']['host']}",
-                    }
-                    services["athens"] = service
-
-                # Nexus
-                if f"{podman_project_name}_nexus_1" in service["container_name"]:
-                    if container["State"] != "running":
-                        logger.error("Nexus is not running")
-                        exit(1)
-                    service["port"] = {
-                        "host": container["Ports"][0]["host_port"],
-                        "container": container["Ports"][0]["container_port"],
-                    }
-                    service[
-                        "url"
-                    ] = f"http://host.containers.internal:{service['port']['host']}"
-                    service["url_local"] = service["url"].replace(
-                        "host.containers.internal", "localhost"
-                    )
-                    r = requests.get(service["url_local"])
-                    if r.status_code != 200:
-                        logger.error(f"Error connecting to Nexus: {r.status_code}")
-                        exit(1)
-                    service["custom_envs"] = {
-                        "PIP_TRUSTED_HOST": f"host.containers.internal:{service['port']['host']}",
-                        "PIP_INDEX": f"http://cachito:cachito@host.containers.internal:{service['port']['host']}/repository/<PIP_REPO_NAME>/pypi",
-                        "PIP_INDEX_URL": f"http://cachito:cachito@host.containers.internal:{service['port']['host']}/repository/<PIP_REPO_NAME>/simple",
-                    }
-                    services["nexus"] = service
-                    # Test nexus credentials
-                    nexus_user = "cachito"
-                    nexus_pass = "cachito"
-                    r = requests.get(
-                        service["url_local"] + "/service/rest/v1/repositories",
-                        auth=(nexus_user, nexus_pass),
-                    )
-                    if r.status_code != 200:
-                        logger.error(
-                            f"Invalid credentials. Error connecting to Nexus: {r.status_code}"
-                        )
-                        exit(1)
-
-                # Cachito
-                if f"{podman_project_name}_cachito-api_1" in service["container_name"]:
-                    if container["State"] != "running":
-                        logger.error("Cachito is not running")
-                        exit(1)
-                    service["port"] = {
-                        "host": container["Ports"][0]["host_port"],
-                        "container": container["Ports"][0]["container_port"],
-                    }
-                    service[
-                        "url"
-                    ] = f"http://host.containers.internal:{service['port']['host']}"
-                    service["url_local"] = service["url"].replace(
-                        "host.containers.internal", "localhost"
-                    )
-                    r = requests.get(service["url_local"] + "/api/v1/status/short")
-                    if r.status_code != 200:
-                        logger.error(f"Error connecting to Cachito: {r.status_code}")
-                        exit(1)
-                    services["cachito"] = service
+            services = _get_services()
             break
 
         # Except ConnectionError
         except:
             retries += 1
-            logger.warning(
-                f"Failed {retries}/{total_retries}. Retrying in {sleep_time_seconds} seconds"
-            )
+            if not ignore_error_msg:
+                logger.warning(
+                    f"Failed {retries}/{total_retries}. Retrying in {sleep_time_seconds} seconds"
+                )
             time.sleep(sleep_time_seconds)
-
     if retries == total_retries:
-        logger.fatal("All retries failed. Services are not available")
+        if not ignore_error_msg:
+            logger.fatal("All retries failed. Services are not available")
         exit(1)
 
     return services
@@ -508,7 +534,12 @@ def get_default_cachito_repo_path():
 
 def is_running(cachito_repo_path: str) -> bool:
     """Check if the services are running"""
-    services = get_services(cachito_repo_path)
+    try:
+        services = get_services(cachito_repo_path, ignore_error_msg=True)
+    except:
+        return False
+
+    # BUG: maybe the following code is never reacheable
     logger.debug("is_running: Checking services")
     for service_name, service in services.items():
         logger.debug(f"Checking {service_name}")
