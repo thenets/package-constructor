@@ -6,6 +6,10 @@ include ./dev-tools/common.mk
 venv:
 	python3 -m venv venv
 	venv/bin/pip install -U pip poetry
+# - Install main packages
+	export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+		&& venv/bin/poetry install
+# - Install all dev packages
 	export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
 		&& venv/bin/poetry install --no-root \
 			--with dev \
@@ -17,7 +21,9 @@ venv:
 clean:
 	rm -rf venv/
 	rm -f requirements-freeze.txt
+	find . -name 'cache' -type d -exec podman unshare chown -R 0:0 {} + || true
 	find . -name 'cache' -type d -exec rm -rf {} + || true
+	find . -name '__pycache__' -type d -exec rm -rf {} + || true
 
 .PHONY: fmt
 ## Run code formatters and linters

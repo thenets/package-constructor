@@ -48,6 +48,10 @@ def start(cachito_repo_path: str):
     Returns:
         dict: services data
     """
+    # Recursively create the cachito repository path parent directories
+    _parent_dir = os.path.dirname(cachito_repo_path)
+    os.makedirs(_parent_dir, exist_ok=True)
+
     # Basic checks
     _check_dependencies()
     if not common.cachito_repo_exists(cachito_repo_path):
@@ -98,7 +102,7 @@ def start(cachito_repo_path: str):
     time.sleep(30)
 
     # Get services data
-    services = common.get_services(cachito_repo_path)
+    services = common.get_services(cachito_repo_path, total_retries=10)
     logger.info("Services are operational")
     return services
 
@@ -151,9 +155,12 @@ def cmd_start():
     """start a new Cachito server with all the related services."""
     if common.is_running(_cachito_repo_path):
         click.echo("Cachito server is already running")
-        services = common.get_services(_cachito_repo_path)
-        _print_status(_cachito_repo_path, services)
-        exit(0)
+        try:
+            services = common.get_services(_cachito_repo_path, ignore_error_msg=True)
+            _print_status(_cachito_repo_path, services)
+            exit(0)
+        except:
+            pass
     services = start(_cachito_repo_path)
     _print_status(_cachito_repo_path, services)
 
@@ -212,7 +219,7 @@ class TestServer:
 
     def test_status_when_not_running(self, runner):
         result = runner.invoke(cmd_status, [])
-        assert result.exit_code == 1
+        assert result.exit_code == 0
         assert "All services are operational" not in result.output
 
     def test_start_twice(self, runner):

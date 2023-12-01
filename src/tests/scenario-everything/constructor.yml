@@ -106,7 +106,7 @@ containers:
 
     # Main Containerfile (required)
     # This is where the main logic of the container build is defined
-    containerfilePath: ./scenario-simple.containerfile
+    containerfilePath: ./Containerfile
 
     # All restrictions applied during the build time
     # if a build can be performed in a container with these restrictions
