@@ -1,0 +1,27 @@
+
+
+---
+
+kind: container
+workdir:
+  path: ./cache/
+sources:
+  - kind: git
+    url: https://github.com/pyca/cryptography.git
+    ref: "41.0.5"
+    path: cryptography
+
+# BUG: the packageManagers should be optional
+packageManagers: {}
+
+containers:
+  - name: "main"
+    imageName: "package-constructor-scenario-simple"
+    containerfilePath: ./scenario-simple.containerfile
+    restrictions:
+      disableDnsResolution: true
+    proxies:
+      python: true
+      golang: true
+    sources_subpath: sources
+    podmanCacheEnabled: false
