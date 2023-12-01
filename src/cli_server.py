@@ -48,6 +48,10 @@ def start(cachito_repo_path: str):
     Returns:
         dict: services data
     """
+    # Recursively create the cachito repository path parent directories
+    _parent_dir = os.path.dirname(cachito_repo_path)
+    os.makedirs(_parent_dir, exist_ok=True)
+
     # Basic checks
     _check_dependencies()
     if not common.cachito_repo_exists(cachito_repo_path):

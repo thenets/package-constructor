@@ -534,6 +534,9 @@ def get_default_cachito_repo_path():
 
 def is_running(cachito_repo_path: str) -> bool:
     """Check if the services are running"""
+    if not os.path.isdir(cachito_repo_path):
+        return False
+    
     try:
         services = get_services(cachito_repo_path, ignore_error_msg=True)
     except:
